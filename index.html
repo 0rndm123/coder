@@ -465,6 +465,10 @@
           captureDiagnostics.textContent = 'Esta câmara não permite controlar a luz pelo browser.';
         }
       }
+      function initialZoomForDiagnostics(track, caps) {
+        const zoom = Number(track.getSettings?.().zoom);
+        return Number.isFinite(zoom) ? zoom : (caps.zoom?.min || 1);
+      }
       async function configureCameraControls(token) {
         const video = byId('reader').querySelector('video');
         const track = video?.srcObject?.getVideoTracks?.()[0];
@@ -486,8 +490,13 @@
           zoomRange.min = String(caps.zoom.min);
           zoomRange.max = String(caps.zoom.max);
           zoomRange.step = String(caps.zoom.step || 0.1);
-          // Actual camera zoom increases code pixel coverage, unlike CSS scale.
-          const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2));
+          // Do not zoom automatically: 2x often magnifies sensor noise and
+          // degrades autofocus in low light. A browser zoom may be digital.
+          // Use the track's actual initial setting rather than forcing 2x.
+          const currentZoom = Number(track.getSettings?.().zoom);
+          const initial = Number.isFinite(currentZoom)
+            ? Math.min(caps.zoom.max, Math.max(caps.zoom.min, currentZoom))
+            : Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1));
           zoomRange.value = String(initial);
           zoomValue.textContent = zoomLabel(initial);
           zoomControl.hidden = false;
@@ -501,9 +510,10 @@
           ? settings.width + '×' + settings.height
           : video.videoWidth && video.videoHeight
             ? video.videoWidth + '×' + video.videoHeight : 'a determinar';
-        captureDiagnostics.textContent = 'Câmara: ' + resolution +
-          (canZoom ? ' · Zoom ajustável' : '') + '. Aponte ao código e aguarde.';
-        if (canZoom) await applyZoom();
+        const label = track.label || 'traseira';
+        captureDiagnostics.textContent = 'Câmara: ' + label + ' · ' + resolution +
+          (canZoom ? ' · Zoom ' + zoomLabel(initialZoomForDiagnostics(track, caps)) : '') +
+          '. Aguarde a focagem; melhore a iluminação se houver grão.';
       }
       // Um único pipeline de descodificação: html5-qrcode 2.3.8 já alterna
       // BarcodeDetector e ZXing quando o browser disponibiliza ambos.
@@ -583,7 +593,7 @@
           // Seleção manual usa o deviceId escolhido, sem sobreposição de constraints.
           const target = selectedId || {facingMode:'environment'};
           const config = {
-            fps: 10,
+            fps: 12,
             videoConstraints: {
               ...(selectedId ? {deviceId:{exact:selectedId}} : {facingMode:'environment'}),
               width:{ideal:1920},
@@ -598,7 +608,7 @@
             // Se constraints de resolução ou de lente falharem, voltar a um
             // arranque simples, permitindo selecionar a câmara manualmente.
             const fallback = rear ? rear.id : {facingMode:'environment'};
-            await decoder.start(fallback, {fps:10}, callback, () => {});
+            await decoder.start(fallback, {fps:12}, callback, () => {});
           }
           cameraRunning = true;
           scanStartedAt = Date.now();
@@ -609,7 +619,8 @@
             const settings = track?.getSettings?.() || {};
             captureDiagnostics.textContent = 'Ainda sem leitura. Vídeo ' +
               (settings.width || '?') + '×' + (settings.height || '?') +
-              '. Centre o Data Matrix, aproxime até ficar nítido ou fotografe.';
+              ' · Zoom ' + zoomLabel(Number(settings.zoom) || 1) +
+              '. Melhore a iluminação e aguarde a focagem; não aproxime em excesso.';
           }, 5000);
           if (generation !== token) { await closeCapture(); return; }
           cameraSelect.value = typeof target === 'string' ? target : '';
