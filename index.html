@@ -8,16 +8,19 @@
   <style>
     :root { color-scheme: light; --ink: #14243a; --muted: #596b80; --bg: #f3f6fa; --edge: #dde5ee; --accent:#1466cb; --good:#087d61; --bad:#bc2845; }
     * {box-sizing:border-box}
+    html,body {max-width:100%;overflow-x:hidden}
     body {margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
     header {background:var(--ink);color:#fff;padding:22px max(18px,calc((100vw - 830px)/2)) 20px}
     header h1 {font-size:25px;line-height:1.1;margin:0 0 7px;font-weight:700}
     header p {margin:0;color:#bdcee2;font-size:14px}
-    main {max-width:830px;margin:auto;padding:18px 14px 42px;display:grid;gap:14px}
+    main {width:100%;max-width:830px;min-width:0;margin:auto;padding:18px 14px 42px;display:grid;gap:14px}
+    main > section {min-width:0}
     section {background:white;border:1px solid var(--edge);border-radius:15px;padding:17px;box-shadow:0 2px 10px #17243e0a}
     .section-header {display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px}
     h2 {font-size:17px;margin:0;font-weight:700}
     .hint {font-size:13px;color:var(--muted);margin:0 0 12px}
-    #reader {width:100%;min-height:175px;overflow:hidden;border-radius:9px}
+    #reader {width:100%;min-width:0;min-height:175px;overflow:hidden;border-radius:9px}
+    #reader canvas {max-width:100%!important}
     #reader video {border-radius:8px}
     #reader button {border-radius:8px;border:1px solid var(--edge);padding:9px 13px;cursor:pointer}
     #reader select {font-size:14px;max-width:100%}
@@ -48,7 +51,17 @@
     .capture-controls {display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
     .capture-controls select,.other-movement select {padding:10px 11px;background:#fff;color:var(--ink);border:1px solid #b8c8da;border-radius:9px;font:inherit;max-width:100%}
     .capture-panel #reader {background:#192333;min-height:235px}
-    .capture-panel #reader video {object-fit:contain;max-height:55vh}
+    /* No telemóvel a pré-visualização ocupa o espaço vertical disponível,
+       sem as faixas laterais escuras típicas de um vídeo horizontal. */
+    .capture-panel #reader video {display:block;width:100%!important;height:min(64dvh,600px)!important;max-height:none!important;object-fit:cover!important;object-position:center}
+    .capture-panel #reader {background:#192333;max-width:100%}
+    .camera-tools {display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+    .zoom-control {display:flex;align-items:center;gap:10px;flex:1;min-width:175px;font-size:14px;font-weight:600}
+    #zoom-range {flex:1;min-width:90px;accent-color:var(--accent);height:36px}
+    #zoom-value {font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+    #torch-toggle[aria-pressed="true"] {background:#fff3d6;border-color:#c99835;color:#67450a}
+    @media(max-width:500px) {.capture-panel{padding:9px}.capture-panel #reader video{height:min(65dvh,540px)!important}}
+
     .capture-info {color:var(--ink);font-size:14px;font-weight:650;margin:0 0 10px}
     .other-movement {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;font-size:14px;font-weight:650}
     .movement-cell.in {color:#075c46;font-weight:700}
@@ -95,6 +108,14 @@
           <select id="camera-select" aria-label="Escolher câmara"><option value="">Traseira (automático)</option></select>
           <button type="button" class="outline" id="capture-cancel">Cancelar</button>
         </div>
+        <div class="camera-tools" id="camera-tools" hidden>
+          <div class="zoom-control" id="zoom-control" hidden>
+            <label for="zoom-range">Zoom</label>
+            <input type="range" id="zoom-range" min="1" max="4" step="0.1" value="1" aria-label="Ampliar imagem da câmara" />
+            <output id="zoom-value" for="zoom-range">1,0×</output>
+          </div>
+          <button type="button" class="outline" id="torch-toggle" aria-pressed="false" hidden>Acender luz</button>
+        </div>
         <div class="capture-controls">
           <button type="button" class="outline" id="capture-photo">Ler de fotografia</button>
           <button type="button" class="outline" id="capture-take-photo">Fotografar código</button>
@@ -102,7 +123,7 @@
           <input type="file" id="capture-camera-file" accept="image/*" capture="environment" hidden />
         </div>
         <p class="footnote" id="capture-diagnostics" aria-live="polite">Preparado para leitura. A câmara traseira e a focagem dependem do telemóvel.</p>
-        <p class="footnote">Aproxime o código até ficar nítido e completamente visível. Se o vídeo não o reconhecer, use «Fotografar código» para tentar uma imagem de maior resolução.</p>
+        <p class="footnote">Posicione o código no centro. Ajuste o zoom para o código ocupar mais espaço, sem perder nitidez. Se não for reconhecido, use «Fotografar código».</p>
       </div>
     </section>
     <section>
@@ -190,6 +211,11 @@
       const captureCameraFile = byId('capture-camera-file');
       const captureDiagnostics = byId('capture-diagnostics');
       const cameraSelect = byId('camera-select');
+      const cameraTools = byId('camera-tools');
+      const zoomControl = byId('zoom-control');
+      const zoomRange = byId('zoom-range');
+      const zoomValue = byId('zoom-value');
+      const torchToggle = byId('torch-toggle');
       const lastScan = byId('last-scan');
       let records = [];
       let storageAvailable = true;
@@ -203,6 +229,10 @@
       let nativeDetector = null;
       let nativeTimer = null;
       let currentVideo = null;
+      let activeTrack = null;
+      let cameraCapabilities = null;
+      let torchEnabled = false;
+      let zoomRequest = 0;
 
       function message(text, variant='') {
         status.textContent = text;
@@ -323,6 +353,15 @@
         nativeTimer = null;
         nativeDetector = null;
         currentVideo = null;
+        activeTrack = null;
+        cameraCapabilities = null;
+        torchEnabled = false;
+        zoomRequest++;
+        cameraTools.hidden = true;
+        zoomControl.hidden = true;
+        torchToggle.hidden = true;
+        torchToggle.setAttribute('aria-pressed','false');
+        torchToggle.textContent = 'Acender luz';
         const current = decoder;
         decoder = null;
         const wasRunning = cameraRunning;
@@ -345,6 +384,82 @@
         movementIn.setAttribute('aria-pressed','false');
         movementOut.setAttribute('aria-pressed','false');
       }
+      // Aumentar a imagem captada na própria câmara (não apenas no CSS) ajuda
+      // quando o código ocupa poucos píxeis. As opções dependem do hardware.
+      function zoomLabel(value) {
+        return Number(value).toFixed(1).replace('.', ',') + '×';
+      }
+      async function applyZoom() {
+        const track = activeTrack;
+        const capabilities = cameraCapabilities;
+        if (!track || !capabilities || !capabilities.zoom) return;
+        const request = ++zoomRequest;
+        const value = Number(zoomRange.value);
+        zoomValue.textContent = zoomLabel(value);
+        try {
+          await track.applyConstraints({advanced:[{zoom:value}]});
+          if (activeTrack !== track || request !== zoomRequest) return;
+          const actual = track.getSettings?.().zoom;
+          if (typeof actual === 'number') zoomValue.textContent = zoomLabel(actual);
+        } catch (error) {
+          if (activeTrack === track && request === zoomRequest) {
+            captureDiagnostics.textContent = 'O telemóvel não permitiu alterar o zoom nesta câmara.';
+          }
+        }
+      }
+      async function toggleTorch() {
+        const track = activeTrack;
+        if (!track || !cameraCapabilities?.torch) return;
+        const next = !torchEnabled;
+        try {
+          await track.applyConstraints({advanced:[{torch:next}]});
+          if (activeTrack !== track) return;
+          torchEnabled = next;
+          torchToggle.setAttribute('aria-pressed', String(next));
+          torchToggle.textContent = next ? 'Apagar luz' : 'Acender luz';
+        } catch (error) {
+          captureDiagnostics.textContent = 'Esta câmara não permite controlar a luz pelo browser.';
+        }
+      }
+      async function configureCameraControls(token) {
+        const video = byId('reader').querySelector('video');
+        const track = video?.srcObject?.getVideoTracks?.()[0];
+        if (!track || generation !== token) return;
+        activeTrack = track;
+        let caps = {};
+        try { caps = track.getCapabilities?.() || {}; }
+        catch (error) { console.warn('Capacidades da câmara indisponíveis:',error); }
+        cameraCapabilities = caps;
+        // A focagem contínua ajuda em códigos impressos a diferentes distâncias.
+        if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+          try { await track.applyConstraints({advanced:[{focusMode:'continuous'}]}); }
+          catch (error) { console.warn('Focagem contínua indisponível:',error); }
+        }
+        if (activeTrack !== track || generation !== token) return;
+        const canZoom = caps.zoom && Number.isFinite(caps.zoom.min) &&
+          Number.isFinite(caps.zoom.max) && caps.zoom.max > caps.zoom.min;
+        if (canZoom) {
+          zoomRange.min = String(caps.zoom.min);
+          zoomRange.max = String(caps.zoom.max);
+          zoomRange.step = String(caps.zoom.step || 0.1);
+          const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1.8));
+          zoomRange.value = String(initial);
+          zoomValue.textContent = zoomLabel(initial);
+          zoomControl.hidden = false;
+        }
+        if (caps.torch === true) {
+          torchToggle.hidden = false;
+        }
+        cameraTools.hidden = !canZoom && caps.torch !== true;
+        const settings = track.getSettings?.() || {};
+        const resolution = settings.width && settings.height
+          ? settings.width + '×' + settings.height
+          : video.videoWidth && video.videoHeight
+            ? video.videoWidth + '×' + video.videoHeight : 'a determinar';
+        captureDiagnostics.textContent = 'Câmara: ' + resolution +
+          (canZoom ? ' · Zoom ajustável' : '') + '. Aponte ao código e aguarde.';
+        if (canZoom) await applyZoom();
+      }
       // Mantém um segundo descodificador a analisar o vídeo. Alguns browsers
       // oferecem leitura nativa com melhor desempenho do que a biblioteca JS.
       async function startNativeDetection(token) {
@@ -356,7 +471,8 @@
           let formats = ['qr_code'];
           if (typeof BarcodeDetector.getSupportedFormats === 'function') {
             const supported = await BarcodeDetector.getSupportedFormats();
-            formats = ['qr_code','ean_13','ean_8','code_128','upc_a','upc_e','data_matrix']
+            formats = ['qr_code','ean_13','ean_8','code_128','code_39','code_93',
+              'codabar','itf','upc_a','upc_e','data_matrix','pdf417']
               .filter(format => supported.includes(format));
           }
           if (!formats.length || generation !== token) return;
@@ -364,9 +480,8 @@
           const video = byId('reader').querySelector('video');
           if (!video || generation !== token) return;
           currentVideo = video;
-          const resolution = video.videoWidth && video.videoHeight
-            ? video.videoWidth + '×' + video.videoHeight : 'a determinar';
-          captureDiagnostics.textContent = 'Leitura nativa + JavaScript ativas. Vídeo: ' + resolution + '.';
+          // A resolução e o zoom são apresentados por configureCameraControls().
+          if (!activeTrack) captureDiagnostics.textContent = 'Leitura nativa e JavaScript ativas.';
           const tick = async () => {
             if (generation !== token || captureDone || !cameraRunning || !nativeDetector) return;
             try {
@@ -425,12 +540,21 @@
         const token = generation;
         captureDone = false;
         showMode(mode);
+        lastScan.textContent = 'A aguardar leitura de ' + (mode === 'entrada' ? 'entrada' : 'saída') + '…';
         capturePanel.hidden = false;
         captureInfo.textContent = 'A preparar a câmara, aguarde…';
         try {
           await stopDecoder();
           if (generation !== token) return;
-          decoder = new Html5Qrcode('reader', {verbose:false});
+          const supported = globalThis.Html5QrcodeSupportedFormats;
+          const formats = supported ? ['QR_CODE','EAN_13','EAN_8','CODE_128','CODE_39',
+            'CODE_93','UPC_A','UPC_E','ITF','CODABAR','DATA_MATRIX','PDF_417']
+            .map(name => supported[name]).filter(value => Number.isInteger(value)) : [];
+          decoder = new Html5Qrcode('reader', {
+            verbose:false,
+            disableFlip:true,
+            ...(formats.length ? {formatsToSupport:formats} : {})
+          });
           cameras = await Html5Qrcode.getCameras();
           if (generation !== token) return;
           cameraSelect.replaceChildren();
@@ -449,7 +573,7 @@
           // Seleção manual usa o deviceId escolhido, sem sobreposição de constraints.
           const target = selectedId || {facingMode:'environment'};
           const config = {
-            fps: 12,
+            fps: 15,
             videoConstraints: {
               ...(selectedId ? {deviceId:{exact:selectedId}} : {facingMode:'environment'}),
               width:{ideal:1920},
@@ -470,9 +594,10 @@
           if (generation !== token) { await closeCapture(); return; }
           cameraSelect.value = typeof target === 'string' ? target : '';
           captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': aponte ao código até ser reconhecido.';
-          captureDiagnostics.textContent = 'Vídeo ativo. A verificar leitores disponíveis…';
+          captureDiagnostics.textContent = 'Vídeo ativo. A verificar os leitores e a focagem…';
           void startNativeDetection(token);
-          message('Câmara ativa. Mantenha o QR Code completo e nítido na imagem.', '');
+          void configureCameraControls(token);
+          message('Câmara ativa. Aponte ao QR code ou código de barras.', '');
         } catch (error) {
           await stopDecoder();
           captureInfo.textContent = 'Câmara indisponível. Pode tentar outra vez ou escolher uma fotografia.';
@@ -535,6 +660,8 @@
       cameraSelect.addEventListener('change', () => {
         if (captureMode && !captureBusy) void beginCapture(captureMode, cameraSelect.value);
       });
+      zoomRange.addEventListener('input', () => { void applyZoom(); });
+      torchToggle.addEventListener('click', () => { void toggleTorch(); });
       capturePhoto.addEventListener('click', () => { if (!captureBusy) captureFile.click(); });
       captureTakePhoto.addEventListener('click', () => { if (!captureBusy) captureCameraFile.click(); });
       for (const input of [captureFile, captureCameraFile]) {
