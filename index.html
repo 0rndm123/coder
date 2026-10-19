@@ -492,11 +492,8 @@
           zoomRange.step = String(caps.zoom.step || 0.1);
           // Do not zoom automatically: 2x often magnifies sensor noise and
           // degrades autofocus in low light. A browser zoom may be digital.
-          // Use the track's actual initial setting rather than forcing 2x.
-          const currentZoom = Number(track.getSettings?.().zoom);
-          const initial = Number.isFinite(currentZoom)
-            ? Math.min(caps.zoom.max, Math.max(caps.zoom.min, currentZoom))
-            : Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1));
+          // Explicitly reset browser-provided zoom to 1x when supported.
+          const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1));
           zoomRange.value = String(initial);
           zoomValue.textContent = zoomLabel(initial);
           zoomControl.hidden = false;
@@ -505,6 +502,8 @@
           torchToggle.hidden = false;
         }
         cameraTools.hidden = !canZoom && caps.torch !== true;
+        if (canZoom) await applyZoom();
+        if (activeTrack !== track || generation !== token) return;
         const settings = track.getSettings?.() || {};
         const resolution = settings.width && settings.height
           ? settings.width + '×' + settings.height
