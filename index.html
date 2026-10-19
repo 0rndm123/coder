@@ -96,10 +96,13 @@
           <button type="button" class="outline" id="capture-cancel">Cancelar</button>
         </div>
         <div class="capture-controls">
-          <button type="button" class="outline" id="capture-photo">Ler QR/código de uma fotografia</button>
+          <button type="button" class="outline" id="capture-photo">Ler de fotografia</button>
+          <button type="button" class="outline" id="capture-take-photo">Fotografar código</button>
           <input type="file" id="capture-file" accept="image/*" hidden />
+          <input type="file" id="capture-camera-file" accept="image/*" capture="environment" hidden />
         </div>
-        <p class="footnote">Aponte a câmara ao código, com boa luz e foco. Para ler uma imagem guardada, use «Ler QR/código de uma fotografia».</p>
+        <p class="footnote" id="capture-diagnostics" aria-live="polite">Preparado para leitura. A câmara traseira e a focagem dependem do telemóvel.</p>
+        <p class="footnote">Aproxime o código até ficar nítido e completamente visível. Se o vídeo não o reconhecer, use «Fotografar código» para tentar uma imagem de maior resolução.</p>
       </div>
     </section>
     <section>
@@ -182,7 +185,10 @@
       const captureInfo = byId('capture-info');
       const captureCancel = byId('capture-cancel');
       const capturePhoto = byId('capture-photo');
+      const captureTakePhoto = byId('capture-take-photo');
       const captureFile = byId('capture-file');
+      const captureCameraFile = byId('capture-camera-file');
+      const captureDiagnostics = byId('capture-diagnostics');
       const cameraSelect = byId('camera-select');
       const lastScan = byId('last-scan');
       let records = [];
@@ -194,6 +200,9 @@
       let captureDone = false;
       let generation = 0;
       let cameras = [];
+      let nativeDetector = null;
+      let nativeTimer = null;
+      let currentVideo = null;
 
       function message(text, variant='') {
         status.textContent = text;
@@ -310,6 +319,10 @@
         return 'Não foi possível iniciar a câmara. Tente escolher outra câmara ou utilizar uma fotografia.';
       }
       async function stopDecoder() {
+        if (nativeTimer) clearTimeout(nativeTimer);
+        nativeTimer = null;
+        nativeDetector = null;
+        currentVideo = null;
         const current = decoder;
         decoder = null;
         const wasRunning = cameraRunning;
@@ -331,6 +344,56 @@
         capturePanel.hidden = true;
         movementIn.setAttribute('aria-pressed','false');
         movementOut.setAttribute('aria-pressed','false');
+      }
+      // Mantém um segundo descodificador a analisar o vídeo. Alguns browsers
+      // oferecem leitura nativa com melhor desempenho do que a biblioteca JS.
+      async function startNativeDetection(token) {
+        if (typeof BarcodeDetector === 'undefined') {
+          captureDiagnostics.textContent = 'Leitura por biblioteca JavaScript. Câmara traseira preferencial.';
+          return;
+        }
+        try {
+          let formats = ['qr_code'];
+          if (typeof BarcodeDetector.getSupportedFormats === 'function') {
+            const supported = await BarcodeDetector.getSupportedFormats();
+            formats = ['qr_code','ean_13','ean_8','code_128','upc_a','upc_e','data_matrix']
+              .filter(format => supported.includes(format));
+          }
+          if (!formats.length || generation !== token) return;
+          nativeDetector = new BarcodeDetector({formats});
+          const video = byId('reader').querySelector('video');
+          if (!video || generation !== token) return;
+          currentVideo = video;
+          const resolution = video.videoWidth && video.videoHeight
+            ? video.videoWidth + '×' + video.videoHeight : 'a determinar';
+          captureDiagnostics.textContent = 'Leitura nativa + JavaScript ativas. Vídeo: ' + resolution + '.';
+          const tick = async () => {
+            if (generation !== token || captureDone || !cameraRunning || !nativeDetector) return;
+            try {
+              if (video.readyState >= 2 && video.videoWidth > 0) {
+                const matches = await nativeDetector.detect(video);
+                if (matches && matches.length && generation === token) {
+                  const match = matches[0];
+                  successCamera(match.rawValue, {
+                    result: {format: {formatName: (match.format || 'DESCONHECIDO').toUpperCase()}}
+                  }, token);
+                }
+              }
+            } catch (error) {
+              // O motor JavaScript continua ativo se a API nativa falhar.
+              console.warn('Leitor nativo indisponível:', error);
+              nativeDetector = null;
+              captureDiagnostics.textContent = 'Leitura por biblioteca JavaScript. Experimente fotografar se não reconhecer.';
+            }
+            if (generation === token && !captureDone && nativeDetector) {
+              nativeTimer = setTimeout(tick, 220);
+            }
+          };
+          nativeTimer = setTimeout(tick, 150);
+        } catch (error) {
+          console.warn('API nativa não disponível:', error);
+          captureDiagnostics.textContent = 'Leitura por biblioteca JavaScript. Experimente fotografar se não reconhecer.';
+        }
       }
       function successCamera(value, result, token) {
         if (generation !== token || captureDone || !captureMode) return;
@@ -382,23 +445,34 @@
             cameraSelect.appendChild(opt);
           });
           const rear = cameras.find(c => /back|rear|environment|traseir|facing back/i.test(c.label || ''));
-          const target = selectedId || (rear ? rear.id : {facingMode:{exact:'environment'}});
-          const config = {fps:10};
+          // Preferir o modo environment do browser (normalmente lente principal).
+          // Seleção manual usa o deviceId escolhido, sem sobreposição de constraints.
+          const target = selectedId || {facingMode:'environment'};
+          const config = {
+            fps: 12,
+            videoConstraints: {
+              ...(selectedId ? {deviceId:{exact:selectedId}} : {facingMode:'environment'}),
+              width:{ideal:1920},
+              height:{ideal:1080}
+            }
+          };
           const callback = (value, result) => successCamera(value, result, token);
           try {
             await decoder.start(target, config, callback, () => {});
           } catch (firstError) {
             if (selectedId) throw firstError;
-            // Alguns telemóveis não respeitam facingMode: escolher a última câmara como alternativa.
-            const fallback = rear ? {facingMode:'environment'} :
-              cameras.length ? cameras[cameras.length - 1].id : {facingMode:'environment'};
-            await decoder.start(fallback, config, callback, () => {});
+            // Se constraints de resolução ou de lente falharem, voltar a um
+            // arranque simples, permitindo selecionar a câmara manualmente.
+            const fallback = rear ? rear.id : (cameras.length ? cameras[cameras.length - 1].id : {facingMode:'environment'});
+            await decoder.start(fallback, {fps:10}, callback, () => {});
           }
           cameraRunning = true;
           if (generation !== token) { await closeCapture(); return; }
           cameraSelect.value = typeof target === 'string' ? target : '';
           captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': aponte ao código até ser reconhecido.';
-          message('Câmara ativa. Aproximar o código com boa luz e foco.', '');
+          captureDiagnostics.textContent = 'Vídeo ativo. A verificar leitores disponíveis…';
+          void startNativeDetection(token);
+          message('Câmara ativa. Mantenha o QR Code completo e nítido na imagem.', '');
         } catch (error) {
           await stopDecoder();
           captureInfo.textContent = 'Câmara indisponível. Pode tentar outra vez ou escolher uma fotografia.';
@@ -462,11 +536,14 @@
         if (captureMode && !captureBusy) void beginCapture(captureMode, cameraSelect.value);
       });
       capturePhoto.addEventListener('click', () => { if (!captureBusy) captureFile.click(); });
-      captureFile.addEventListener('change', () => {
-        const file = captureFile.files && captureFile.files[0];
-        captureFile.value = '';
-        if (file) void scanPhoto(file);
-      });
+      captureTakePhoto.addEventListener('click', () => { if (!captureBusy) captureCameraFile.click(); });
+      for (const input of [captureFile, captureCameraFile]) {
+        input.addEventListener('change', () => {
+          const file = input.files && input.files[0];
+          input.value = '';
+          if (file) void scanPhoto(file);
+        });
+      }
       byId('manual-form').addEventListener('submit', event => {
         event.preventDefault();
         const input = byId('manual-value');
