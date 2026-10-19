@@ -47,11 +47,21 @@
   function recentRecords(records, limit = 10) {
     if (!Array.isArray(records)) throw new TypeError('Histórico inválido.');
     const n = Number.isSafeInteger(limit) ? Math.max(0, Math.min(limit, 100)) : 10;
-    return records.map((record, index) => ({ record, index }))
-      .sort((a, b) => (Date.parse(b.record.scanned_at) - Date.parse(a.record.scanned_at)) ||
-        (b.index - a.index))
-      .slice(0, n)
-      .map(item => item.record);
+    if (n === 0) return [];
+    // Hold only the newest n events: O(number of scans * n), O(n) memory.
+    // A full history sort would become expensive as the number of scans grows.
+    const newest = [];
+    records.forEach((record, index) => {
+      const timestamp = Date.parse(record.scanned_at);
+      let pos = 0;
+      while (pos < newest.length &&
+        (newest[pos].timestamp > timestamp ||
+          (newest[pos].timestamp === timestamp && newest[pos].index > index))) pos++;
+      if (pos >= n) return;
+      newest.splice(pos, 0, { record, timestamp, index });
+      if (newest.length > n) newest.pop();
+    });
+    return newest.map(item => item.record);
   }
 
   function parseJsonLines(input) {
