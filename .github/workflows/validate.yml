@@ -30,4 +30,4 @@ jobs:
         run: node --test tests/*.test.cjs
       - name: Static security checks
         run: |
-          node -e "const fs=require('node:fs'); const assert=require('node:assert/strict'); const html=fs.readFileSync('index.html','utf8'); const app=fs.readFileSync('assets/app.js','utf8'); assert(!/<script\\s*>/i.test(html)); assert(!/\\.innerHTML\\s*=/i.test(app)); assert(/Content-Security-Policy/.test(html)); assert(/assets\\/scan-domain\\.js/.test(html));"
+          node -e "const fs=require('node:fs'); const assert=require('node:assert/strict'); const html=fs.readFileSync('index.html','utf8'); const app=fs.readFileSync('assets/app.js','utf8'); assert(!html.includes('<script>')); assert(!html.includes('<style>')); assert(!app.includes('.innerHTML')); assert(html.includes('Content-Security-Policy')); assert(html.includes('assets/scan-domain.js'));"
