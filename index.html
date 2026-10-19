@@ -162,6 +162,11 @@
         status.className = variant;
       }
       function setMovement(next) {
+        // Uma mudança de movimento permite registar imediatamente o mesmo código.
+        if (movement !== next) {
+          lastCode = null;
+          lastCodeAt = 0;
+        }
         movement = next;
         movementIn.setAttribute('aria-pressed', String(next === 'entrada'));
         movementOut.setAttribute('aria-pressed', String(next === 'saida'));
