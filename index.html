@@ -92,6 +92,7 @@
     td button {padding:3px 6px;font-size:12px}
     .footnote {font-size:12px;color:var(--muted)}
     @media(max-width:500px) {header h1{font-size:23px}section{padding:14px}.two {grid-template-columns:1fr}button{min-height:43px}.two button{width:100%}}
+  .recent-scan-list{list-style:none;padding:0;display:grid;gap:6px}.recent-scan-list li{padding:9px;border:1px solid #dde5ee;border-radius:9px;overflow-wrap:anywhere;white-space:pre-wrap}.read-confirmation{position:fixed;top:10px;left:10px;right:10px;max-width:640px;margin:auto;z-index:10010;padding:20px;border-radius:15px;border:3px solid #087d61;background:#e8fff1;color:#103a2b;box-shadow:0 10px 40px #0006}.read-confirmation p{overflow-wrap:anywhere;white-space:pre-wrap;max-height:30vh;overflow:auto}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
 </head>
@@ -109,6 +110,7 @@
         <button type="button" class="movement-button out" id="movement-out" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4H9.5l-2 3H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.5l-2-3Z"/><circle cx="12" cy="13.5" r="3.5"/></svg><span>Registar saída</span></button>
       </div>
       <p class="last-scan" id="last-scan" role="status" aria-live="polite">Toque num dos botões para começar.</p>
+      <h3>Últimas 10 leituras</h3><ol id="recent-scans" class="recent-scan-list"></ol>
       <div class="capture-panel" id="capture-panel" hidden>
         <p class="capture-info" id="capture-info" aria-live="polite">A preparar câmara…</p>
         <div id="reader"></div>
@@ -194,6 +196,7 @@
     </section>
     <p class="footnote" style="margin:0 4px">A informação permanece apenas neste browser e dispositivo. As leituras feitas no PC e no telemóvel não se partilham automaticamente enquanto não houver API e base de dados central. Limpar dados do browser ou usar navegação privada pode apagar o histórico. Exporte regularmente o TXT.</p>
   </main>
+  <div id="read-confirmation" class="read-confirmation" hidden role="status"><strong id="read-confirmation-title"></strong><p id="read-confirmation-value"></p><button type="button" id="read-confirmation-dismiss">Fechar</button></div>
   <script>
     (() => {
       'use strict';
@@ -226,6 +229,10 @@
       const zoomValue = byId('zoom-value');
       const torchToggle = byId('torch-toggle');
       const lastScan = byId('last-scan');
+      const recentScans = byId('recent-scans');
+      const readConfirmation = byId('read-confirmation');
+      let readConfirmationTimer;
+      byId('read-confirmation-dismiss').addEventListener('click', () => { clearTimeout(readConfirmationTimer); readConfirmation.hidden = true; });
       let records = [];
       let storageAvailable = true;
       let captureMode = null;
@@ -286,6 +293,17 @@
         exportButton.disabled = records.length === 0;
         clearButton.disabled = records.length === 0;
         rows.replaceChildren();
+        recentScans.replaceChildren();
+        for(const r of records.slice(-10).reverse()){
+          const li=document.createElement('li');
+          const head=document.createElement('strong');
+          head.textContent=(r.movement==='entrada'?'Entrada':r.movement==='saida'?'Saída':'Sem movimento')+' · '+displayTimestamp(r.scanned_at)+' · '+r.format;
+          const value=document.createElement('div');
+          value.textContent=r.value;
+          li.append(head,value);
+          recentScans.appendChild(li);
+        }
+        if(!records.length){const li=document.createElement('li');li.textContent='Sem leituras.';recentScans.appendChild(li);}
         if (!records.length) {
           const tr = document.createElement('tr');
           const td = document.createElement('td');
@@ -336,6 +354,11 @@
         }
         const r = {id:newId(),scanned_at:new Date().toISOString(),format,value,source,movement:mode};
         if (!save([...records, r])) return false;
+        byId('read-confirmation-title').textContent=(mode==='entrada'?'ENTRADA':'SAÍDA')+' registada · '+format;
+        byId('read-confirmation-value').textContent=value;
+        readConfirmation.hidden=false;
+        clearTimeout(readConfirmationTimer);
+        readConfirmationTimer=setTimeout(()=>{readConfirmation.hidden=true;},7000);
         const name = mode === 'entrada' ? 'ENTRADA' : 'SAÍDA';
         message(name + ' registada: ' + value.slice(0,100) + (value.length > 100 ? '…' : ''), 'success');
         lastScan.textContent = name + ' registada com sucesso: ' + value.slice(0,80) + (value.length > 80 ? '…' : '');
