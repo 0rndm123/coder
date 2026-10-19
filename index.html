@@ -242,14 +242,14 @@
       let captureDone = false;
       let generation = 0;
       let cameras = [];
-      let nativeDetector = null;
-      let nativeTimer = null;
-      let currentVideo = null;
+      // html5-qrcode already alternates between BarcodeDetector and ZXing.
+      // Do not run another parallel detector on the same camera stream.
       let activeTrack = null;
       let cameraCapabilities = null;
       let torchEnabled = false;
       let zoomRequest = 0;
       let scanStartedAt = 0;
+      let scanDiagnosticTimer = null;
 
       function message(text, variant='') {
         status.textContent = text;
@@ -382,14 +382,12 @@
         return 'Não foi possível iniciar a câmara. Tente escolher outra câmara ou utilizar uma fotografia.';
       }
       async function stopDecoder() {
-        if (nativeTimer) clearTimeout(nativeTimer);
-        nativeTimer = null;
-        nativeDetector = null;
-        currentVideo = null;
         activeTrack = null;
         cameraCapabilities = null;
         torchEnabled = false;
         zoomRequest++;
+        if (scanDiagnosticTimer) clearTimeout(scanDiagnosticTimer);
+        scanDiagnosticTimer = null;
         cameraTools.hidden = true;
         zoomControl.hidden = true;
         torchToggle.hidden = true;
@@ -494,62 +492,10 @@
           (canZoom ? ' · Zoom ajustável' : '') + '. Aponte ao código e aguarde.';
         if (canZoom) await applyZoom();
       }
-      // Mantém um segundo descodificador a analisar o vídeo. Alguns browsers
-      // oferecem leitura nativa com melhor desempenho do que a biblioteca JS.
-      async function startNativeDetection(token) {
-        if (typeof BarcodeDetector === 'undefined') {
-          captureDiagnostics.textContent = 'Leitura por biblioteca JavaScript. Câmara traseira preferencial.';
-          return;
-        }
-        try {
-          let formats = ['qr_code'];
-          if (typeof BarcodeDetector.getSupportedFormats === 'function') {
-            const supported = await BarcodeDetector.getSupportedFormats();
-            formats = ['qr_code','ean_13','ean_8','code_128','code_39','code_93',
-              'codabar','itf','upc_a','upc_e','data_matrix','pdf417']
-              .filter(format => supported.includes(format));
-          }
-          if (!formats.length || generation !== token) return;
-          nativeDetector = new BarcodeDetector({formats});
-          const video = byId('reader').querySelector('video');
-          if (!video || generation !== token) return;
-          currentVideo = video;
-          // A resolução e o zoom são apresentados por configureCameraControls().
-          if (!activeTrack) captureDiagnostics.textContent = 'Leitura nativa e JavaScript ativas.';
-          const tick = async () => {
-            if (generation !== token || captureDone || !cameraRunning || !nativeDetector) return;
-            try {
-              if (video.readyState >= 2 && video.videoWidth > 0) {
-                const matches = await nativeDetector.detect(video);
-                if (matches && matches.length && generation === token) {
-                  const match = matches[0];
-                  successCamera(match.rawValue, {
-                    result: {format: {formatName: (match.format || 'DESCONHECIDO').toUpperCase()}}
-                  }, token);
-                }
-              }
-            } catch (error) {
-              // O motor JavaScript continua ativo se a API nativa falhar.
-              console.warn('Leitor nativo indisponível:', error);
-              nativeDetector = null;
-              captureDiagnostics.textContent = 'Leitura por biblioteca JavaScript. Experimente fotografar se não reconhecer.';
-            }
-            if (generation === token && !captureDone && nativeDetector) {
-              if (Date.now() - scanStartedAt > 4500 && activeTrack) {
-                const settings = activeTrack.getSettings?.() || {};
-                captureDiagnostics.textContent = 'Sem leitura: vídeo ' +
-                  (settings.width || video.videoWidth) + '×' + (settings.height || video.videoHeight) +
-                  '. Se estiver desfocado, escolha outra câmara ou fotografe o código.';
-              }
-              nativeTimer = setTimeout(tick, 170);
-            }
-          };
-          nativeTimer = setTimeout(tick, 150);
-        } catch (error) {
-          console.warn('API nativa não disponível:', error);
-          captureDiagnostics.textContent = 'Leitura por biblioteca JavaScript. Experimente fotografar se não reconhecer.';
-        }
-      }
+      // Um único pipeline de descodificação: html5-qrcode 2.3.8 já alterna
+      // BarcodeDetector e ZXing quando o browser disponibiliza ambos.
+      // Rodar outra instância de BarcodeDetector em paralelo aumenta a carga de CPU
+      // e pode atrasar o autofocus e o reconhecimento de Data Matrix.
       function successCamera(value, result, token) {
         if (generation !== token || captureDone || !captureMode) return;
         captureDone = true;
@@ -588,12 +534,15 @@
           await stopDecoder();
           if (generation !== token) return;
           const supported = globalThis.Html5QrcodeSupportedFormats;
-          const formats = supported ? ['QR_CODE','EAN_13','EAN_8','CODE_128','CODE_39',
-            'CODE_93','UPC_A','UPC_E','ITF','CODABAR','DATA_MATRIX','PDF_417']
+          // Data Matrix is intentionally first: small GS1 Data Matrix labels
+          // are not QR codes. The decoder also handles common retail barcodes.
+          const formats = supported ? ['DATA_MATRIX','QR_CODE','EAN_13','EAN_8','CODE_128','CODE_39',
+            'CODE_93','UPC_A','UPC_E','ITF','CODABAR','PDF_417']
             .map(name => supported[name]).filter(value => Number.isInteger(value)) : [];
           decoder = new Html5Qrcode('reader', {
             verbose:false,
             disableFlip:true,
+            useBarCodeDetectorIfSupported:true,
             ...(formats.length ? {formatsToSupport:formats} : {})
           });
           cameras = await Html5Qrcode.getCameras();
@@ -614,7 +563,7 @@
           // Seleção manual usa o deviceId escolhido, sem sobreposição de constraints.
           const target = selectedId || {facingMode:'environment'};
           const config = {
-            fps: 20,
+            fps: 10,
             videoConstraints: {
               ...(selectedId ? {deviceId:{exact:selectedId}} : {facingMode:'environment'}),
               width:{ideal:1920},
@@ -633,17 +582,25 @@
           }
           cameraRunning = true;
           scanStartedAt = Date.now();
+          if (scanDiagnosticTimer) clearTimeout(scanDiagnosticTimer);
+          scanDiagnosticTimer = setTimeout(() => {
+            if (generation !== token || captureDone || !cameraRunning) return;
+            const track = byId('reader').querySelector('video')?.srcObject?.getVideoTracks?.()[0];
+            const settings = track?.getSettings?.() || {};
+            captureDiagnostics.textContent = 'Ainda sem leitura. Vídeo ' +
+              (settings.width || '?') + '×' + (settings.height || '?') +
+              '. Centre o Data Matrix, aproxime até ficar nítido ou fotografe.';
+          }, 5000);
           if (generation !== token) { await closeCapture(); return; }
           const reticle = document.createElement('div');
           reticle.className = 'scanner-reticle';
           reticle.setAttribute('aria-hidden', 'true');
           byId('reader').appendChild(reticle);
           cameraSelect.value = typeof target === 'string' ? target : '';
-          captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': aponte ao código até ser reconhecido.';
-          captureDiagnostics.textContent = 'Vídeo ativo. A verificar os leitores e a focagem…';
-          void startNativeDetection(token);
+          captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': centre o QR, Data Matrix ou código de barras.';
+          captureDiagnostics.textContent = 'Descodificador Data Matrix, QR e barras ativo. A verificar a focagem…';
           void configureCameraControls(token);
-          message('Câmara ativa. Aponte ao QR code ou código de barras.', '');
+          message('Câmara ativa. Leia QR, Data Matrix ou códigos de barras.', '');
         } catch (error) {
           await stopDecoder();
           captureInfo.textContent = 'Câmara indisponível. Pode tentar outra vez ou escolher uma fotografia.';
