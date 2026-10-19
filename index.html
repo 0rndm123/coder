@@ -95,6 +95,8 @@
   .recent-scan-list{list-style:none;padding:0;display:grid;gap:6px}.recent-scan-list li{padding:9px;border:1px solid #dde5ee;border-radius:9px;overflow-wrap:anywhere;white-space:pre-wrap}.read-confirmation{position:fixed;top:10px;left:10px;right:10px;max-width:640px;margin:auto;z-index:10010;padding:20px;border-radius:15px;border:3px solid #087d61;background:#e8fff1;color:#103a2b;box-shadow:0 10px 40px #0006}.read-confirmation p{overflow-wrap:anywhere;white-space:pre-wrap;max-height:30vh;overflow:auto}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+  <!-- ZXing-C++ WASM provides a high-accuracy fallback for small Data Matrix labels. -->
+  <script src="https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.5/dist/iife/reader/index.js" defer></script>
 </head>
 <body>
   <header>
@@ -609,6 +611,29 @@
           captureBusy = false;
         }
       }
+      // ZXing-C++/WASM is used only as a fallback, on this device.
+      // It does not send code contents to any server.
+      async function decodeWithWasm(file) {
+        if (typeof globalThis.ZXingWASM?.readBarcodes !== 'function') return null;
+        try {
+          const matches = await globalThis.ZXingWASM.readBarcodes(file, {
+            tryHarder: true,
+            tryDownscale: false,
+            formats: ['DataMatrix','QRCode','Code128','Code39','EAN13',
+              'EAN8','UPCA','UPCE','ITF','PDF417'],
+            maxNumberOfSymbols: 1
+          });
+          const match = matches?.find(item => item && item.text && item.isValid !== false);
+          if (!match) return null;
+          return {
+            decodedText: match.text,
+            result: {format:{formatName: match.format || 'DESCONHECIDO'}}
+          };
+        } catch (error) {
+          console.warn('Motor ZXing-WASM indisponível:', error);
+          return null;
+        }
+      }
       // Try the whole high-resolution photograph before bounded crops.
       // GS1 Data Matrix codes may occupy only a small fraction of the frame.
       async function scanPhoto(file) {
@@ -638,6 +663,10 @@
           captureInfo.textContent = 'A analisar a imagem completa…';
           try { found = await decoder.scanFileV2(file, false); }
           catch (error) { /* The image may contain a very small barcode. */ }
+          if (!found) {
+            captureInfo.textContent = 'A testar o descodificador avançado de Data Matrix…';
+            found = await decodeWithWasm(file);
+          }
           if (!found && typeof createImageBitmap === 'function') {
             bitmap = await createImageBitmap(file);
             const W = bitmap.width, H = bitmap.height;
@@ -667,8 +696,11 @@
                 canvas.width = canvas.height = 0;
                 if (!blob) continue;
                 const sample = new File([blob], 'data-matrix-crop.png', {type:'image/png'});
-                try { found = await decoder.scanFileV2(sample, false); }
-                catch (error) { /* Try the next region, no false successes. */ }
+                found = await decodeWithWasm(sample);
+                if (!found) {
+                  try { found = await decoder.scanFileV2(sample, false); }
+                  catch (error) { /* Try next region, never invent a result. */ }
+                }
               }
             }
           }
