@@ -47,20 +47,29 @@
     .movement-button.in {background:#087d61}
     .movement-button.out {background:#b52b45}
     .movement-button[aria-pressed="true"] {border-color:#14243a;box-shadow:0 0 0 3px #bed3eb}
-    .capture-panel {margin-top:14px;padding:13px;background:#f6f9fd;border:1px solid var(--edge);border-radius:12px}
+    .capture-panel {position:fixed;inset:0;z-index:9999;padding:12px 12px max(12px,env(safe-area-inset-bottom));background:#101923;color:white;border:0;border-radius:0;display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain}
+    body.scanning {overflow:hidden}
+    .capture-panel .capture-info {color:white;margin:0 0 8px;flex-shrink:0}
+    .capture-panel .footnote {color:#d5e0ea;margin:4px 0}
+    .capture-panel .capture-controls label {color:white}
+    .capture-panel .capture-controls {margin:6px 0}
+    .capture-panel #reader {position:relative;flex:1 1 auto;min-height:46dvh;max-height:70dvh;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid #40546d;border-radius:14px}
+    .capture-panel #reader > div {width:100%}
+    .capture-panel #reader video {display:block;width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important;object-position:center}
+    .capture-panel .scanner-reticle {position:absolute;z-index:4;pointer-events:none;top:50%;left:50%;transform:translate(-50%,-50%);width:min(78%,320px);aspect-ratio:1.25;border:3px solid #a7efbe;border-radius:15px}
+    .capture-panel button {min-height:42px}
     .capture-controls {display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
     .capture-controls select,.other-movement select {padding:10px 11px;background:#fff;color:var(--ink);border:1px solid #b8c8da;border-radius:9px;font:inherit;max-width:100%}
     .capture-panel #reader {background:#192333;min-height:235px}
     /* No telemóvel a pré-visualização ocupa o espaço vertical disponível,
        sem as faixas laterais escuras típicas de um vídeo horizontal. */
-    .capture-panel #reader video {display:block;width:100%!important;height:min(64dvh,600px)!important;max-height:none!important;object-fit:cover!important;object-position:center}
-    .capture-panel #reader {background:#192333;max-width:100%}
+    .capture-panel #reader {max-width:100%}
     .camera-tools {display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
     .zoom-control {display:flex;align-items:center;gap:10px;flex:1;min-width:175px;font-size:14px;font-weight:600}
     #zoom-range {flex:1;min-width:90px;accent-color:var(--accent);height:36px}
     #zoom-value {font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
     #torch-toggle[aria-pressed="true"] {background:#fff3d6;border-color:#c99835;color:#67450a}
-    @media(max-width:500px) {.capture-panel{padding:9px}.capture-panel #reader video{height:min(65dvh,540px)!important}}
+    @media(max-width:500px) {.capture-panel{padding:10px}.capture-panel #reader{min-height:48dvh;max-height:66dvh}}
 
     .capture-info {color:var(--ink);font-size:14px;font-weight:650;margin:0 0 10px}
     .other-movement {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;font-size:14px;font-weight:650}
@@ -123,7 +132,7 @@
           <input type="file" id="capture-camera-file" accept="image/*" capture="environment" hidden />
         </div>
         <p class="footnote" id="capture-diagnostics" aria-live="polite">Preparado para leitura. A câmara traseira e a focagem dependem do telemóvel.</p>
-        <p class="footnote">Posicione o código no centro. Ajuste o zoom para o código ocupar mais espaço, sem perder nitidez. Se não for reconhecido, use «Fotografar código».</p>
+        <p class="footnote">Aponte ao código e mantenha-o nítido. Se estiver desfocado, escolha outra câmara ou use «Fotografar código».</p>
       </div>
     </section>
     <section>
@@ -233,6 +242,7 @@
       let cameraCapabilities = null;
       let torchEnabled = false;
       let zoomRequest = 0;
+      let scanStartedAt = 0;
 
       function message(text, variant='') {
         status.textContent = text;
@@ -381,6 +391,7 @@
         captureBusy = false;
         captureMode = null;
         capturePanel.hidden = true;
+        document.body.classList.remove('scanning');
         movementIn.setAttribute('aria-pressed','false');
         movementOut.setAttribute('aria-pressed','false');
       }
@@ -442,7 +453,7 @@
           zoomRange.min = String(caps.zoom.min);
           zoomRange.max = String(caps.zoom.max);
           zoomRange.step = String(caps.zoom.step || 0.1);
-          const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1.8));
+          const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1));
           zoomRange.value = String(initial);
           zoomValue.textContent = zoomLabel(initial);
           zoomControl.hidden = false;
@@ -501,7 +512,13 @@
               captureDiagnostics.textContent = 'Leitura por biblioteca JavaScript. Experimente fotografar se não reconhecer.';
             }
             if (generation === token && !captureDone && nativeDetector) {
-              nativeTimer = setTimeout(tick, 220);
+              if (Date.now() - scanStartedAt > 4500 && activeTrack) {
+                const settings = activeTrack.getSettings?.() || {};
+                captureDiagnostics.textContent = 'Sem leitura: vídeo ' +
+                  (settings.width || video.videoWidth) + '×' + (settings.height || video.videoHeight) +
+                  '. Se estiver desfocado, escolha outra câmara ou fotografe o código.';
+              }
+              nativeTimer = setTimeout(tick, 170);
             }
           };
           nativeTimer = setTimeout(tick, 150);
@@ -542,6 +559,7 @@
         showMode(mode);
         lastScan.textContent = 'A aguardar leitura de ' + (mode === 'entrada' ? 'entrada' : 'saída') + '…';
         capturePanel.hidden = false;
+        document.body.classList.add('scanning');
         captureInfo.textContent = 'A preparar a câmara, aguarde…';
         try {
           await stopDecoder();
@@ -573,7 +591,7 @@
           // Seleção manual usa o deviceId escolhido, sem sobreposição de constraints.
           const target = selectedId || {facingMode:'environment'};
           const config = {
-            fps: 15,
+            fps: 20,
             videoConstraints: {
               ...(selectedId ? {deviceId:{exact:selectedId}} : {facingMode:'environment'}),
               width:{ideal:1920},
@@ -587,11 +605,16 @@
             if (selectedId) throw firstError;
             // Se constraints de resolução ou de lente falharem, voltar a um
             // arranque simples, permitindo selecionar a câmara manualmente.
-            const fallback = rear ? rear.id : (cameras.length ? cameras[cameras.length - 1].id : {facingMode:'environment'});
+            const fallback = rear ? rear.id : {facingMode:'environment'};
             await decoder.start(fallback, {fps:10}, callback, () => {});
           }
           cameraRunning = true;
+          scanStartedAt = Date.now();
           if (generation !== token) { await closeCapture(); return; }
+          const reticle = document.createElement('div');
+          reticle.className = 'scanner-reticle';
+          reticle.setAttribute('aria-hidden', 'true');
+          byId('reader').appendChild(reticle);
           cameraSelect.value = typeof target === 'string' ? target : '';
           captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': aponte ao código até ser reconhecido.';
           captureDiagnostics.textContent = 'Vídeo ativo. A verificar os leitores e a focagem…';
@@ -631,6 +654,7 @@
             await stopDecoder();
             captureMode = null;
             capturePanel.hidden = true;
+            document.body.classList.remove('scanning');
             movementIn.setAttribute('aria-pressed','false');
             movementOut.setAttribute('aria-pressed','false');
           }
