@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#14243a" />
+  <title>Leitor de Códigos | Câmara e Pistola</title>
+  <style>
+    :root { color-scheme: light; --ink: #14243a; --muted: #596b80; --bg: #f3f6fa; --edge: #dde5ee; --accent:#1466cb; --good:#087d61; --bad:#bc2845; }
+    * {box-sizing:border-box}
+    body {margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
+    header {background:var(--ink);color:#fff;padding:22px max(18px,calc((100vw - 830px)/2)) 20px}
+    header h1 {font-size:25px;line-height:1.1;margin:0 0 7px;font-weight:700}
+    header p {margin:0;color:#bdcee2;font-size:14px}
+    main {max-width:830px;margin:auto;padding:18px 14px 42px;display:grid;gap:14px}
+    section {background:white;border:1px solid var(--edge);border-radius:15px;padding:17px;box-shadow:0 2px 10px #17243e0a}
+    .section-header {display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:11px}
+    h2 {font-size:17px;margin:0;font-weight:700}
+    .hint {font-size:13px;color:var(--muted);margin:0 0 12px}
+    #reader {width:100%;min-height:175px;overflow:hidden;border-radius:9px}
+    #reader video {border-radius:8px}
+    #reader button {border-radius:8px;border:1px solid var(--edge);padding:9px 13px;cursor:pointer}
+    #reader select {font-size:14px;max-width:100%}
+    .two {display:grid;grid-template-columns: 1fr auto;gap:9px}
+    .scan-controls {display:flex;gap:9px;flex-wrap:wrap;margin:0 0 10px;align-items:center}
+    .scanner-state {font-size:13px;color:var(--muted)}
+    .scanner-state.ready {color:var(--good);font-weight:650}
+    .scanner-box {padding:12px;border:1px solid var(--edge);border-radius:10px;background:#f8fbff}
+    .scanner-box:focus-within {border-color:#1466cb;box-shadow:0 0 0 2px #1466cb22}
+    #scanner-value {font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+    .tag {background:#edf2f8;color:#395069;border-radius:6px;padding:2px 6px;font-size:12px;white-space:nowrap}
+    input[type=text] {width:100%;min-width:0;border:1px solid #bdcddd;border-radius:9px;padding:11px 12px;font-size:16px;color:var(--ink)}
+    button {font:inherit;font-weight:600;border-radius:9px;border:1px solid transparent;padding:10px 13px;cursor:pointer}
+    button:focus-visible,input:focus-visible {outline:3px solid #90bdfc;outline-offset:2px}
+    button:disabled {cursor:not-allowed;opacity:.5}
+    .primary {background:var(--accent);color:white}
+    .outline {background:white;color:var(--ink);border-color:#cbd7e4}
+    .danger {background:white;color:var(--bad);border-color:#e7b7c2}
+    .actions {display:flex;gap:8px;flex-wrap:wrap}
+    .kpi {font-size:28px;font-weight:750;letter-spacing:-1px;line-height:1}
+    .muted {color:var(--muted)}
+    #status {font-size:14px;border-radius:9px;background:#eef4fb;padding:11px 12px;min-height:44px}
+    #status.success {background:#e6f6ef;color:#075c46}
+    #status.error {background:#fff0f1;color:#8f1634}
+    #status.warn {background:#fff4df;color:#78490b}
+    .table-wrap {overflow-x:auto;max-height:340px;overflow-y:auto;border:1px solid var(--edge);border-radius:10px;margin:12px 0 14px}
+    table {width:100%;border-collapse:collapse;min-width:620px;font-size:13px}
+    th,td {padding:9px 10px;border-bottom:1px solid var(--edge);text-align:left;vertical-align:top}
+    th {position:sticky;top:0;background:#f6f9fc;color:var(--muted);font-weight:600}
+    td.value {font-family:ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;max-width:290px;white-space:pre-wrap}
+    td button {padding:3px 6px;font-size:12px}
+    .footnote {font-size:12px;color:var(--muted)}
+    @media(max-width:500px) {header h1{font-size:23px}section{padding:14px}.two {grid-template-columns:1fr}button{min-height:43px}.two button{width:100%}}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Leitor de códigos</h1>
+    <p>Telemóvel e PC · Câmara, pistola USB/Bluetooth e teclado · Exportação TXT</p>
+  </header>
+  <main>
+    <section>
+      <div class="section-header"><h2>1. Ler com a câmara</h2><span class="muted" style="font-size:12px">Sem conta</span></div>
+      <p class="hint">Escolha a câmara, autorize o acesso e aproxime o código. Também pode selecionar uma fotografia.</p>
+      <div id="reader"></div>
+      <p class="hint" style="margin-top:10px;margin-bottom:0">Leituras consecutivas do mesmo código são ignoradas durante 3 segundos para evitar repetições involuntárias. Leituras posteriores são registadas.</p>
+    </section>
+    <section>
+      <h2 style="margin-bottom:9px">2. Ler com pistola USB ou Bluetooth (PC)</h2>
+      <p class="hint">Ligue a pistola em modo teclado (USB HID / Bluetooth HID). Clique em <strong>Ativar pistola</strong> e faça as leituras. Cada leitura termina automaticamente quando a pistola envia <strong>Enter</strong> ou <strong>Tab</strong>.</p>
+      <div class="scan-controls">
+        <button type="button" class="outline" id="scanner-arm">Ativar pistola</button>
+        <span id="scanner-state" class="scanner-state" aria-live="polite">Inativa: ative para começar</span>
+      </div>
+      <div class="scanner-box">
+        <form id="scanner-form" class="two">
+          <input type="text" id="scanner-value" placeholder="Campo de receção da pistola" aria-label="Campo de receção da pistola" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="none" />
+          <button type="submit" class="primary">Registar código</button>
+        </form>
+        <p class="footnote" style="margin:8px 0 0">Sem Enter/Tab configurado na pistola? Pode usar o botão «Registar código». Os códigos repetidos são conservados como leituras distintas.</p>
+      </div>
+      <p class="hint" style="margin:10px 0 0">Se a pistola não escrever neste campo, confirme o modo HID, a ligação e o foco do cursor. A simbologia não é identificável automaticamente com um leitor HID normal.</p>
+    </section>
+    <section>
+      <h2 style="margin-bottom:9px">3. Introduzir manualmente</h2>
+      <form id="manual-form" class="two">
+        <input type="text" id="manual-value" placeholder="Código a registar" autocomplete="off" aria-label="Código a registar" required />
+        <button type="submit" class="primary">Adicionar</button>
+      </form>
+    </section>
+    <section aria-live="polite" aria-atomic="true">
+      <div id="status">A carregar o leitor…</div>
+    </section>
+    <section>
+      <div class="section-header">
+        <h2>4. Histórico de leituras</h2>
+        <div style="text-align:right"><div class="kpi" id="total">0</div><span class="muted" style="font-size:12px">registos</span></div>
+      </div>
+      <div class="table-wrap">
+        <table aria-label="Leituras registadas">
+          <thead><tr><th>Data/hora local</th><th>Origem</th><th>Formato</th><th>Valor</th><th></th></tr></thead>
+          <tbody id="rows"><tr><td colspan="5" class="muted">Ainda não existem leituras.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary" id="export">Exportar TXT</button>
+        <button type="button" class="outline" id="backup-import">Importar TXT</button>
+        <button type="button" class="danger" id="clear">Apagar histórico</button>
+        <input type="file" id="file-import" accept=".txt,.jsonl,application/json,text/plain" hidden />
+      </div>
+      <p class="footnote" style="margin-bottom:0">O TXT contém um registo JSON por linha (JSON Lines), preservando os zeros à esquerda e o conteúdo dos QR Codes, mesmo com acentos ou quebras de linha. Fica preparado para posterior importação para PostgreSQL.</p>
+    </section>
+    <p class="footnote" style="margin:0 4px">A informação permanece apenas neste browser e dispositivo. As leituras feitas no PC e no telemóvel não se partilham automaticamente enquanto não houver API e base de dados central. Limpar dados do browser ou usar navegação privada pode apagar o histórico. Exporte regularmente o TXT.</p>
+  </main>
+  <script>
+    (() => {
+      'use strict';
+      const KEY = 'leitor_codigos_mvp_v1'; // manter chave anterior: preservar histórico
+      const status = document.getElementById('status');
+      const total = document.getElementById('total');
+      const rows = document.getElementById('rows');
+      const exportButton = document.getElementById('export');
+      const clearButton = document.getElementById('clear');
+      const scannerInput = document.getElementById('scanner-value');
+      const scannerState = document.getElementById('scanner-state');
+      const scannerArm = document.getElementById('scanner-arm');
+      let records = [];
+      let storageAvailable = true;
+      let lastCode = null;
+      let lastCodeAt = 0;
+
+      function message(text, variant='') {
+        status.textContent = text;
+        status.className = variant;
+      }
+      function newId() {
+        if (globalThis.crypto && crypto.randomUUID) return crypto.randomUUID();
+        return 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+      }
+      function isRecord(r) {
+        return r && typeof r === 'object' && typeof r.id === 'string' &&
+          typeof r.scanned_at === 'string' && !Number.isNaN(Date.parse(r.scanned_at)) &&
+          typeof r.value === 'string' && typeof r.format === 'string' &&
+          ['camera', 'manual', 'importado', 'scanner_hid'].includes(r.source);
+      }
+      function save(next) {
+        try {
+          localStorage.setItem(KEY, JSON.stringify(next));
+          records = next;
+          storageAvailable = true;
+          render();
+          return true;
+        } catch (error) {
+          storageAvailable = false;
+          message('Não foi possível guardar os dados neste browser. Verifique o armazenamento ou as permissões.', 'error');
+          return false;
+        }
+      }
+      function displayTimestamp(iso) {
+        const date = new Date(iso);
+        return new Intl.DateTimeFormat('pt-PT', { dateStyle:'short', timeStyle:'medium' }).format(date);
+      }
+      function render() {
+        total.textContent = records.length.toLocaleString('pt-PT');
+        exportButton.disabled = records.length === 0;
+        clearButton.disabled = records.length === 0;
+        rows.replaceChildren();
+        if (!records.length) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 5; td.className = 'muted';
+          td.textContent = 'Ainda não existem leituras.';
+          tr.appendChild(td); rows.appendChild(tr);
+          return;
+        }
+        for (const r of records.slice(-80).reverse()) {
+          const tr = document.createElement('tr');
+          const date = document.createElement('td'); date.textContent = displayTimestamp(r.scanned_at);
+          const origin = document.createElement('td');
+          const names = {camera: 'Câmara', scanner_hid: 'Pistola', manual: 'Manual', importado: 'Importado'};
+          origin.textContent = names[r.source] || r.source;
+          const format = document.createElement('td'); format.textContent = r.format === 'DESCONHECIDO' ? '—' : r.format;
+          const val = document.createElement('td'); val.className = 'value'; val.textContent = r.value;
+          const actions = document.createElement('td');
+          const del = document.createElement('button'); del.className='outline';del.type='button';
+          del.textContent='Remover'; del.title='Remover apenas esta leitura';
+          del.addEventListener('click', () => {
+            save(records.filter(x => x.id !== r.id));
+            message('Leitura removida.', 'success');
+          });
+          actions.appendChild(del); tr.append(date, origin, format, val, actions); rows.appendChild(tr);
+        }
+      }
+      function add(value, format, source) {
+        if (typeof value !== 'string' || !value.length) {
+          message('O código não pode estar vazio.', 'warn'); return;
+        }
+        const r = { id: newId(), scanned_at: new Date().toISOString(), format, value, source };
+        if (save([...records, r])) {
+          message('Leitura registada: ' + value.slice(0,100) + (value.length > 100 ? '…' : ''), 'success');
+          if (source === 'camera' && navigator.vibrate) navigator.vibrate(60);
+        }
+      }
+      try {
+        const s = localStorage.getItem(KEY);
+        if (s) {
+          const parsed = JSON.parse(s);
+          records = Array.isArray(parsed) ? parsed.filter(isRecord) : [];
+        }
+      } catch (error) {
+        storageAvailable = false;
+        message('Não foi possível recuperar o histórico local. Não apague dados sem verificar os seus ficheiros exportados.', 'error');
+      }
+      render();
+      document.getElementById('manual-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const input = document.getElementById('manual-value');
+        const code = input.value.trim();
+        if (code) { add(code, 'MANUAL', 'manual'); input.value=''; input.focus(); }
+      });
+      function scannerSubmit() {
+        // Preservar o valor completo do código como string (inclusive zeros à esquerda).
+        const value = scannerInput.value;
+        if (!value.trim()) { scannerInput.value = ''; scannerInput.focus(); return; }
+        add(value, 'DESCONHECIDO', 'scanner_hid');
+        scannerInput.value = '';
+        scannerInput.focus();
+      }
+      document.getElementById('scanner-form').addEventListener('submit', event => {
+        event.preventDefault();
+        scannerSubmit();
+      });
+      // Há pistolas configuradas para terminar a leitura com Tab em vez de Enter.
+      scannerInput.addEventListener('keydown', event => {
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          scannerSubmit();
+        }
+      });
+      scannerInput.addEventListener('focus', () => {
+        scannerState.textContent = 'Pronta para leitura';
+        scannerState.className = 'scanner-state ready';
+      });
+      scannerInput.addEventListener('blur', () => {
+        scannerState.textContent = 'Em pausa: clique em «Ativar pistola»';
+        scannerState.className = 'scanner-state';
+      });
+      scannerArm.addEventListener('click', () => scannerInput.focus());
+      exportButton.addEventListener('click', () => {
+        const content = records.map(r => JSON.stringify(r)).join('\n') + '\n';
+        const blob = new Blob([content], { type:'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href=url;
+        a.download='leituras_' + new Date().toISOString().replace(/[-:]/g,'').replace(/T/,'_').slice(0,15) + '.txt';
+        document.body.appendChild(a);a.click();a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        message('TXT gerado. Confirme que o ficheiro foi guardado no dispositivo.', 'success');
+      });
+      clearButton.addEventListener('click', () => {
+        if (!confirm('Apagar todas as ' + records.length + ' leituras deste dispositivo? Exporte primeiro o TXT.')) return;
+        if (save([])) message('Histórico local apagado.', 'success');
+      });
+      const fileImport = document.getElementById('file-import');
+      document.getElementById('backup-import').addEventListener('click', () => fileImport.click());
+      fileImport.addEventListener('change', async () => {
+        const file = fileImport.files && fileImport.files[0]; fileImport.value='';
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { message('O ficheiro excede o limite de 5 MB.', 'warn'); return; }
+        try {
+          const lines = (await file.text()).split(/\r?\n/).filter(s => s.trim());
+          const imported = lines.map(s => JSON.parse(s));
+          if (!imported.every(isRecord)) throw new Error('Formato de registo inválido.');
+          const seen = new Set(records.map(r => r.id));
+          const unseen = imported.filter(r => !seen.has(r.id) && (seen.add(r.id), true));
+          if (save([...records, ...unseen])) message('Importação concluída: ' + unseen.length + ' leituras novas.', 'success');
+        } catch (error) {
+          message('Não foi possível importar o ficheiro. Utilize o TXT exportado por esta aplicação.', 'error');
+        }
+      });
+      window.addEventListener('load', () => {
+        if (!storageAvailable) return;
+        if (!window.isSecureContext) {
+          message('A câmara pode estar indisponível. Publique a aplicação num endereço HTTPS (por exemplo, Netlify).', 'warn');
+        }
+        if (typeof Html5QrcodeScanner === 'undefined') {
+          message('A biblioteca da câmara não carregou. A pistola USB/Bluetooth e a introdução manual continuam disponíveis.', 'warn');
+          return;
+        }
+        const scanner = new Html5QrcodeScanner('reader', {
+          fps: 10,
+          rememberLastUsedCamera: true,
+          showTorchButtonIfSupported: true,
+          showZoomSliderIfSupported: true
+        }, false);
+        scanner.render((decodedText, decodedResult) => {
+          const now = Date.now();
+          if (decodedText === lastCode && now - lastCodeAt < 3000) return;
+          const format = decodedResult?.result?.format?.formatName || 'DESCONHECIDO';
+          add(decodedText, format, 'camera');
+          lastCode = decodedText; lastCodeAt = now;
+        }, () => {});
+        if (window.isSecureContext) message('Leitor pronto. Pode usar câmara, pistola USB/Bluetooth ou introdução manual.', '');
+      });
+    })();
+  </script>
+</body>
+</html>
