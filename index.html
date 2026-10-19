@@ -134,7 +134,7 @@
           <input type="file" id="capture-camera-file" accept="image/*" capture="environment" hidden />
         </div>
         <p class="footnote" id="capture-diagnostics" aria-live="polite">Preparado para leitura. A câmara traseira e a focagem dependem do telemóvel.</p>
-        <p class="footnote">Aponte ao código e mantenha-o nítido. Se estiver desfocado, escolha outra câmara ou use «Fotografar código».</p>
+        <p class="footnote">Lê QR, Data Matrix (código quadrado pequeno em etiquetas) e barras. Para códigos pequenos, use «Fotografar código»: serão analisadas também regiões ampliadas.</p>
       </div>
     </section>
     <section>
@@ -609,28 +609,78 @@
           captureBusy = false;
         }
       }
+      // Try the whole high-resolution photograph before bounded crops.
+      // GS1 Data Matrix codes may occupy only a small fraction of the frame.
       async function scanPhoto(file) {
         if (!captureMode || captureBusy) return;
         if (typeof Html5Qrcode === 'undefined') {
-          message('A biblioteca de leitura não carregou.', 'error');
+          message('O descodificador não carregou.', 'error');
           return;
         }
-        if (!file.type.startsWith('image/')) {
-          message('Selecione uma fotografia válida.', 'warn');
+        if (!file.type.startsWith('image/') || file.size > 25 * 1024 * 1024) {
+          message('Escolha uma fotografia até 25 MB.', 'warn');
           return;
         }
         captureBusy = true;
         generation++;
         captureDone = false;
+        const token = generation;
         const mode = captureMode;
+        let bitmap = null;
+        let found = null;
         try {
           await stopDecoder();
-          decoder = new Html5Qrcode('reader', {verbose:false});
-          captureInfo.textContent = 'A analisar a fotografia…';
-          const result = await decoder.scanFileV2(file, true);
-          const text = result.decodedText;
-          const format = result.result?.format?.formatName || 'DESCONHECIDO';
-          if (add(text, format, 'camera', mode)) {
+          if (generation !== token) return;
+          decoder = new Html5Qrcode('reader', {
+            verbose: false,
+            useBarCodeDetectorIfSupported: true
+          });
+          captureInfo.textContent = 'A analisar a imagem completa…';
+          try { found = await decoder.scanFileV2(file, false); }
+          catch (error) { /* The image may contain a very small barcode. */ }
+          if (!found && typeof createImageBitmap === 'function') {
+            bitmap = await createImageBitmap(file);
+            const W = bitmap.width, H = bitmap.height;
+            if (W && H) {
+              const regions = [
+                [0.20,0.20,0.60,0.60],
+                [0.05,0.18,0.90,0.48],
+                [0.40,0.14,0.58,0.62],
+                [0.02,0.14,0.58,0.62],
+                [0.22,0.40,0.62,0.58]
+              ];
+              for (let n = 0; n < regions.length && !found; n++) {
+                if (generation !== token) break;
+                captureInfo.textContent = 'A analisar códigos pequenos… ' + (n + 1) + '/' + regions.length;
+                const [x,y,w,h] = regions[n];
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.min(1600, Math.max(640, Math.round(W * w * 2)));
+                canvas.height = Math.min(1600, Math.max(640, Math.round(H * h * 2)));
+                const ctx = canvas.getContext('2d');
+                if (!ctx) break;
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(bitmap, Math.round(W*x), Math.round(H*y),
+                  Math.round(W*w), Math.round(H*h),
+                  0, 0, canvas.width, canvas.height);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                canvas.width = canvas.height = 0;
+                if (!blob) continue;
+                const sample = new File([blob], 'data-matrix-crop.png', {type:'image/png'});
+                try { found = await decoder.scanFileV2(sample, false); }
+                catch (error) { /* Try the next region, no false successes. */ }
+              }
+            }
+          }
+          if (generation !== token || !captureMode) return;
+          if (!found) {
+            message('Código não identificado. Fotografe mais perto, com o Data Matrix nítido.', 'warn');
+            captureInfo.textContent = 'Não reconhecido. Pode tentar outra fotografia.';
+            return;
+          }
+          const value = found.decodedText;
+          const format = found.result?.format?.formatName || 'DESCONHECIDO';
+          if (add(value, format, 'camera', mode)) {
             await stopDecoder();
             captureMode = null;
             capturePanel.hidden = true;
@@ -639,9 +689,11 @@
             movementOut.setAttribute('aria-pressed','false');
           }
         } catch (error) {
-          message('O código não foi reconhecido na fotografia. Tente uma imagem mais nítida, com o código completo e bem iluminado.', 'warn');
-          captureInfo.textContent = 'Fotografia não reconhecida. Tente novamente ou use a câmara.';
+          console.warn('Erro na leitura da fotografia:', error);
+          message('Não foi possível analisar a fotografia.', 'error');
+          captureInfo.textContent = 'Erro na leitura da fotografia.';
         } finally {
+          if (bitmap) bitmap.close();
           captureBusy = false;
         }
       }
