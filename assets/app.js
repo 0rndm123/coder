@@ -65,13 +65,7 @@
         if (globalThis.crypto && crypto.randomUUID) return crypto.randomUUID();
         return 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2);
       }
-      function isRecord(r) {
-        return r && typeof r === 'object' && typeof r.id === 'string' &&
-          typeof r.scanned_at === 'string' && !Number.isNaN(Date.parse(r.scanned_at)) &&
-          typeof r.value === 'string' && typeof r.format === 'string' &&
-          ['camera', 'manual', 'importado', 'scanner_hid'].includes(r.source) &&
-          (r.movement == null || ['entrada', 'saida'].includes(r.movement));
-      }
+      function isRecord(r) { return ScanDomain.isRecord(r); }
       function save(next) {
         try {
           localStorage.setItem(KEY, JSON.stringify(next));
@@ -94,7 +88,7 @@
         clearButton.disabled = records.length === 0;
         rows.replaceChildren();
         recentScans.replaceChildren();
-        for(const r of records.slice(-10).reverse()){
+        for(const r of ScanDomain.recentRecords(records, 10)){
           const li=document.createElement('li');
           const head=document.createElement('strong');
           head.textContent=(r.movement==='entrada'?'Entrada':r.movement==='saida'?'Saída':'Sem movimento')+' · '+displayTimestamp(r.scanned_at)+' · '+r.format;
@@ -148,11 +142,12 @@
           message('Escolha ENTRADA ou SAÍDA antes de registar o código.', 'warn');
           return false;
         }
-        if (typeof value !== 'string' || !value.length) {
-          message('O código não pode estar vazio.', 'warn');
+        if (typeof value !== 'string' || !value.length || value.length > ScanDomain.MAX_VALUE_LENGTH) {
+          message('O código está vazio ou excede o limite permitido.', 'warn');
           return false;
         }
         const r = {id:newId(),scanned_at:new Date().toISOString(),format,value,source,movement:mode};
+        if (!isRecord(r)) { message('Registo inválido. Confirme o código e volte a tentar.', 'warn'); return false; }
         if (!save([...records, r])) return false;
         byId('read-confirmation-title').textContent=(mode==='entrada'?'ENTRADA':'SAÍDA')+' registada · '+format;
         byId('read-confirmation-value').textContent=value;
@@ -575,14 +570,23 @@
         if (!file) return;
         if (file.size > 5 * 1024 * 1024) {message('O ficheiro excede 5 MB.', 'warn');return;}
         try {
-          const lines = (await file.text()).split(/\r?\n/).filter(line => line.trim());
-          const imported = lines.map(line => JSON.parse(line));
-          if (!imported.every(isRecord)) throw new Error('Formato inválido.');
-          const seen = new Set(records.map(r => r.id));
-          const unseen = imported.filter(r => !seen.has(r.id) && (seen.add(r.id), true));
-          if (save([...records, ...unseen])) message('Importação concluída: ' + unseen.length + ' leituras novas.', 'success');
+          const imported = ScanDomain.parseJsonLines(await file.text());
+          const merge = ScanDomain.mergeRecords(records, imported);
+          if (save(merge.records)) message('Importação concluída: ' + merge.inserted + ' leituras novas.', 'success');
         } catch (error) {
           message('Não foi possível importar o ficheiro. Utilize um TXT exportado pela aplicação.', 'error');
+        }
+      });
+      window.addEventListener('storage', event => {
+        if (event.key !== KEY) return;
+        try {
+          const loaded = event.newValue ? JSON.parse(event.newValue) : [];
+          if (!Array.isArray(loaded) || !loaded.every(isRecord)) throw new Error('Histórico inválido');
+          records = loaded;
+          render();
+          message('O histórico foi atualizado noutra janela deste browser.', 'warn');
+        } catch (error) {
+          message('Alteração externa inválida. Faça uma cópia de segurança antes de continuar.', 'error');
         }
       });
       window.addEventListener('load', () => {
