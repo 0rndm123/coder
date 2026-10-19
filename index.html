@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#14243a" />
-  <title>Leitor de Códigos | Câmara e Pistola</title>
+  <title>Registo de entradas e saídas | Leitor de códigos</title>
   <style>
     :root { color-scheme: light; --ink: #14243a; --muted: #596b80; --bg: #f3f6fa; --edge: #dde5ee; --accent:#1466cb; --good:#087d61; --bad:#bc2845; }
     * {box-sizing:border-box}
@@ -37,20 +37,25 @@
     .outline {background:white;color:var(--ink);border-color:#cbd7e4}
     .danger {background:white;color:var(--bad);border-color:#e7b7c2}
     .actions {display:flex;gap:8px;flex-wrap:wrap}
-    .movement-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-    .movement-button {min-height:76px;display:flex;align-items:center;justify-content:center;gap:9px;color:white;font-size:20px;letter-spacing:.01em;border:3px solid transparent}
-    .movement-button .movement-arrow {font-size:27px;line-height:1}
+    [hidden] {display:none!important}
+    .movement-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+    .movement-button {min-height:94px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;color:white;font-size:18px;line-height:1.25;border:3px solid transparent;border-radius:13px;cursor:pointer}
+    .movement-button svg {width:29px;height:29px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
     .movement-button.in {background:#087d61}
     .movement-button.out {background:#b52b45}
-    .movement-button[aria-pressed="true"] {border-color:#15253c;box-shadow:0 0 0 3px #b4c7dd}
-    .movement-button[aria-pressed="false"] {opacity:.87}
-    .movement-current {margin:12px 0 0;border:1px solid var(--edge);border-radius:9px;padding:9px 11px;font-size:14px;background:#f7f9fc;color:var(--muted);font-weight:600}
-    .movement-current.in {background:#e6f6ef;color:#075c46;border-color:#8ccbb5}
-    .movement-current.out {background:#fcecf0;color:#92223b;border-color:#e1adbb}
+    .movement-button[aria-pressed="true"] {border-color:#14243a;box-shadow:0 0 0 3px #bed3eb}
+    .capture-panel {margin-top:14px;padding:13px;background:#f6f9fd;border:1px solid var(--edge);border-radius:12px}
+    .capture-controls {display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+    .capture-controls select,.other-movement select {padding:10px 11px;background:#fff;color:var(--ink);border:1px solid #b8c8da;border-radius:9px;font:inherit;max-width:100%}
+    .capture-panel #reader {background:#192333;min-height:235px}
+    .capture-panel #reader video {object-fit:contain;max-height:55vh}
+    .capture-info {color:var(--ink);font-size:14px;font-weight:650;margin:0 0 10px}
+    .other-movement {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;font-size:14px;font-weight:650}
     .movement-cell.in {color:#075c46;font-weight:700}
     .movement-cell.out {color:#92223b;font-weight:700}
     .movement-cell.unknown {color:var(--muted)}
-    @media(max-width:500px) {.movement-button {font-size:17px;min-height:72px;gap:5px}.movement-button .movement-arrow {font-size:23px}}
+    .last-scan {font-size:14px;color:var(--muted);padding:10px 12px;border:1px solid var(--edge);border-radius:9px;margin:12px 0 0}
+    @media(max-width:500px) {.movement-button {font-size:16px;min-height:90px}.capture-controls select {flex:1;min-width:0}}
     .kpi {font-size:28px;font-weight:750;letter-spacing:-1px;line-height:1}
     .muted {color:var(--muted)}
     #status {font-size:14px;border-radius:9px;background:#eef4fb;padding:11px 12px;min-height:44px}
@@ -74,20 +79,40 @@
     <p>Telemóvel e PC · Câmara, pistola USB/Bluetooth e teclado · Exportação TXT</p>
   </header>
   <main>
-    <section class="mode-section" aria-label="Registar entrada ou saída">
-      <div class="section-header"><h2>1. Selecionar movimento</h2><span class="tag">Obrigatório</span></div>
-      <p class="hint">Toque em Entrada ou Saída antes de ler. Todas as leituras seguintes ficam associadas ao movimento escolhido, até o alterar.</p>
-      <div class="movement-actions" role="group" aria-label="Tipo de movimento">
-        <button type="button" class="movement-button in" id="movement-in" aria-pressed="false"><span class="movement-arrow" aria-hidden="true">↓</span> ENTRADA</button>
-        <button type="button" class="movement-button out" id="movement-out" aria-pressed="false"><span class="movement-arrow" aria-hidden="true">↑</span> SAÍDA</button>
+    <section class="capture-section">
+      <div class="section-header"><h2>1. Registar com a câmara</h2><span class="tag">Toque e leia</span></div>
+      <p class="hint">Escolha o movimento. A câmara abre para ler um código e o registo é guardado automaticamente.</p>
+      <div class="movement-actions" role="group" aria-label="Registar movimento por leitura de código">
+        <button type="button" class="movement-button in" id="movement-in" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4H9.5l-2 3H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.5l-2-3Z"/><circle cx="12" cy="13.5" r="3.5"/></svg><span>Registar entrada</span></button>
+        <button type="button" class="movement-button out" id="movement-out" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 4H9.5l-2 3H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.5l-2-3Z"/><circle cx="12" cy="13.5" r="3.5"/></svg><span>Registar saída</span></button>
       </div>
-      <p class="movement-current" id="movement-current" role="status" aria-live="polite">Nenhum movimento selecionado.</p>
+      <p class="last-scan" id="last-scan" role="status" aria-live="polite">Toque num dos botões para começar.</p>
+      <div class="capture-panel" id="capture-panel" hidden>
+        <p class="capture-info" id="capture-info" aria-live="polite">A preparar câmara…</p>
+        <div id="reader"></div>
+        <div class="capture-controls">
+          <label for="camera-select">Câmara</label>
+          <select id="camera-select" aria-label="Escolher câmara"><option value="">Traseira (automático)</option></select>
+          <button type="button" class="outline" id="capture-cancel">Cancelar</button>
+        </div>
+        <div class="capture-controls">
+          <button type="button" class="outline" id="capture-photo">Ler QR/código de uma fotografia</button>
+          <input type="file" id="capture-file" accept="image/*" hidden />
+        </div>
+        <p class="footnote">Aponte a câmara ao código, com boa luz e foco. Para ler uma imagem guardada, use «Ler QR/código de uma fotografia».</p>
+      </div>
     </section>
     <section>
-      <div class="section-header"><h2>2. Ler com a câmara</h2><span class="muted" style="font-size:12px">Sem conta</span></div>
-      <p class="hint">Escolha a câmara, autorize o acesso e aproxime o código. Também pode selecionar uma fotografia.</p>
-      <div id="reader"></div>
-      <p class="hint" style="margin-top:10px;margin-bottom:0">Leituras consecutivas do mesmo código são ignoradas durante 3 segundos para evitar repetições involuntárias. Leituras posteriores são registadas.</p>
+      <h2 style="margin-bottom:8px">2. Movimento para pistola ou registo manual</h2>
+      <div class="other-movement">
+        <label for="other-movement">Tipo de movimento</label>
+        <select id="other-movement" required>
+          <option value="">Escolher entrada ou saída</option>
+          <option value="entrada">Entrada</option>
+          <option value="saida">Saída</option>
+        </select>
+      </div>
+      <p class="hint" style="margin:0">Esta opção só é necessária para leituras com pistola e introdução manual.</p>
     </section>
     <section>
       <h2 style="margin-bottom:9px">3. Ler com pistola USB ou Bluetooth (PC)</h2>
@@ -139,40 +164,46 @@
   <script>
     (() => {
       'use strict';
-      const KEY = 'leitor_codigos_mvp_v1'; // manter chave anterior: preservar histórico
-      const status = document.getElementById('status');
-      const total = document.getElementById('total');
-      const rows = document.getElementById('rows');
-      const exportButton = document.getElementById('export');
-      const clearButton = document.getElementById('clear');
-      const scannerInput = document.getElementById('scanner-value');
-      const scannerState = document.getElementById('scanner-state');
-      const scannerArm = document.getElementById('scanner-arm');
-      const movementIn = document.getElementById('movement-in');
-      const movementOut = document.getElementById('movement-out');
-      const movementCurrent = document.getElementById('movement-current');
-      let movement = null;
+      // Manter a chave histórica para não perder leituras já efetuadas neste browser.
+      const KEY = 'leitor_codigos_mvp_v1';
+      const byId = id => document.getElementById(id);
+      const status = byId('status');
+      const total = byId('total');
+      const rows = byId('rows');
+      const exportButton = byId('export');
+      const clearButton = byId('clear');
+      const scannerInput = byId('scanner-value');
+      const scannerState = byId('scanner-state');
+      const scannerArm = byId('scanner-arm');
+      const movementIn = byId('movement-in');
+      const movementOut = byId('movement-out');
+      const otherMovement = byId('other-movement');
+      const capturePanel = byId('capture-panel');
+      const captureInfo = byId('capture-info');
+      const captureCancel = byId('capture-cancel');
+      const capturePhoto = byId('capture-photo');
+      const captureFile = byId('capture-file');
+      const cameraSelect = byId('camera-select');
+      const lastScan = byId('last-scan');
       let records = [];
       let storageAvailable = true;
-      let lastCode = null;
-      let lastCodeAt = 0;
+      let captureMode = null;
+      let decoder = null;
+      let cameraRunning = false;
+      let captureBusy = false;
+      let captureDone = false;
+      let generation = 0;
+      let cameras = [];
 
       function message(text, variant='') {
         status.textContent = text;
         status.className = variant;
       }
-      function setMovement(next) {
-        // Uma mudança de movimento permite registar imediatamente o mesmo código.
-        if (movement !== next) {
-          lastCode = null;
-          lastCodeAt = 0;
-        }
-        movement = next;
-        movementIn.setAttribute('aria-pressed', String(next === 'entrada'));
-        movementOut.setAttribute('aria-pressed', String(next === 'saida'));
-        movementCurrent.className = 'movement-current ' + (next === 'entrada' ? 'in' : 'out');
-        movementCurrent.textContent = next === 'entrada' ? 'Movimento ativo: ENTRADA' : 'Movimento ativo: SAÍDA';
-        message('Modo ' + (next === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ' ativo. Leia o próximo código.', 'success');
+      function showMode(mode) {
+        captureMode = mode;
+        movementIn.setAttribute('aria-pressed', String(mode === 'entrada'));
+        movementOut.setAttribute('aria-pressed', String(mode === 'saida'));
+        captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': aponte a câmara ao código.';
       }
       function newId() {
         if (globalThis.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -194,13 +225,12 @@
           return true;
         } catch (error) {
           storageAvailable = false;
-          message('Não foi possível guardar os dados neste browser. Verifique o armazenamento ou as permissões.', 'error');
+          message('Não foi possível guardar os dados. Verifique o armazenamento do browser.', 'error');
           return false;
         }
       }
       function displayTimestamp(iso) {
-        const date = new Date(iso);
-        return new Intl.DateTimeFormat('pt-PT', { dateStyle:'short', timeStyle:'medium' }).format(date);
+        return new Intl.DateTimeFormat('pt-PT', {dateStyle:'short',timeStyle:'medium'}).format(new Date(iso));
       }
       function render() {
         total.textContent = records.length.toLocaleString('pt-PT');
@@ -210,87 +240,257 @@
         if (!records.length) {
           const tr = document.createElement('tr');
           const td = document.createElement('td');
-          td.colSpan = 6; td.className = 'muted';
+          td.colSpan = 6;
+          td.className = 'muted';
           td.textContent = 'Ainda não existem leituras.';
-          tr.appendChild(td); rows.appendChild(tr);
+          tr.appendChild(td);
+          rows.appendChild(tr);
           return;
         }
         for (const r of records.slice(-80).reverse()) {
           const tr = document.createElement('tr');
-          const date = document.createElement('td'); date.textContent = displayTimestamp(r.scanned_at);
+          const date = document.createElement('td');
+          date.textContent = displayTimestamp(r.scanned_at);
           const movementCell = document.createElement('td');
           movementCell.textContent = r.movement === 'entrada' ? 'Entrada' : r.movement === 'saida' ? 'Saída' : '—';
           movementCell.className = 'movement-cell ' + (r.movement === 'entrada' ? 'in' : r.movement === 'saida' ? 'out' : 'unknown');
           const origin = document.createElement('td');
-          const names = {camera: 'Câmara', scanner_hid: 'Pistola', manual: 'Manual', importado: 'Importado'};
+          const names = {camera:'Câmara',scanner_hid:'Pistola',manual:'Manual',importado:'Importado'};
           origin.textContent = names[r.source] || r.source;
-          const format = document.createElement('td'); format.textContent = r.format === 'DESCONHECIDO' ? '—' : r.format;
-          const val = document.createElement('td'); val.className = 'value'; val.textContent = r.value;
+          const format = document.createElement('td');
+          format.textContent = r.format === 'DESCONHECIDO' ? '—' : r.format;
+          const val = document.createElement('td');
+          val.className = 'value';
+          val.textContent = r.value;
           const actions = document.createElement('td');
-          const del = document.createElement('button'); del.className='outline';del.type='button';
-          del.textContent='Remover'; del.title='Remover apenas esta leitura';
+          const del = document.createElement('button');
+          del.className = 'outline';
+          del.type = 'button';
+          del.textContent = 'Remover';
+          del.title = 'Remover apenas esta leitura';
           del.addEventListener('click', () => {
-            save(records.filter(x => x.id !== r.id));
-            message('Leitura removida.', 'success');
+            if (save(records.filter(x => x.id !== r.id))) message('Leitura removida.', 'success');
           });
-          actions.appendChild(del); tr.append(date, movementCell, origin, format, val, actions); rows.appendChild(tr);
+          actions.appendChild(del);
+          tr.append(date, movementCell, origin, format, val, actions);
+          rows.appendChild(tr);
         }
       }
-      function add(value, format, source) {
-        if (!movement) {
-          message('Selecione ENTRADA ou SAÍDA antes de registar códigos.', 'warn');
+      function add(value, format, source, mode) {
+        if (!['entrada','saida'].includes(mode)) {
+          message('Escolha ENTRADA ou SAÍDA antes de registar o código.', 'warn');
           return false;
         }
         if (typeof value !== 'string' || !value.length) {
-          message('O código não pode estar vazio.', 'warn'); return false;
+          message('O código não pode estar vazio.', 'warn');
+          return false;
         }
-        const r = { id: newId(), scanned_at: new Date().toISOString(), format, value, source, movement };
-        if (save([...records, r])) {
-          message((movement === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ' registada: ' + value.slice(0,100) + (value.length > 100 ? '…' : ''), 'success');
-          if (source === 'camera' && navigator.vibrate) navigator.vibrate(60);
-          return true;
-        }
-        return false;
+        const r = {id:newId(),scanned_at:new Date().toISOString(),format,value,source,movement:mode};
+        if (!save([...records, r])) return false;
+        const name = mode === 'entrada' ? 'ENTRADA' : 'SAÍDA';
+        message(name + ' registada: ' + value.slice(0,100) + (value.length > 100 ? '…' : ''), 'success');
+        lastScan.textContent = name + ' registada com sucesso: ' + value.slice(0,80) + (value.length > 80 ? '…' : '');
+        if (source === 'camera' && navigator.vibrate) navigator.vibrate(100);
+        return true;
       }
+      function requireOtherMode() {
+        if (!otherMovement.value) {
+          message('Escolha o tipo de movimento para pistola ou registo manual.', 'warn');
+          otherMovement.focus();
+          return null;
+        }
+        return otherMovement.value;
+      }
+      function cameraError(error) {
+        const m = String(error && (error.message || error) || '');
+        if (!window.isSecureContext) return 'A câmara exige HTTPS. Utilize o endereço seguro do Cloudflare Tunnel.';
+        if (/NotAllowed|Permission|denied/i.test(m)) return 'Acesso à câmara recusado. Autorize a câmara nas permissões do browser.';
+        if (/NotFound|DevicesNotFound/i.test(m)) return 'Nenhuma câmara disponível. Verifique o dispositivo ou escolha outra câmara.';
+        if (/NotReadable|TrackStart|in use/i.test(m)) return 'A câmara está ocupada por outra aplicação. Feche-a e volte a tentar.';
+        return 'Não foi possível iniciar a câmara. Tente escolher outra câmara ou utilizar uma fotografia.';
+      }
+      async function stopDecoder() {
+        const current = decoder;
+        decoder = null;
+        const wasRunning = cameraRunning;
+        cameraRunning = false;
+        if (!current) return;
+        if (wasRunning) {
+          try { await current.stop(); }
+          catch (error) { console.warn('Falha ao parar a câmara:', error); }
+        }
+        try { current.clear(); }
+        catch (error) { console.warn('Falha ao limpar o leitor:', error); }
+      }
+      async function closeCapture() {
+        generation++;
+        captureBusy = true;
+        await stopDecoder();
+        captureBusy = false;
+        captureMode = null;
+        capturePanel.hidden = true;
+        movementIn.setAttribute('aria-pressed','false');
+        movementOut.setAttribute('aria-pressed','false');
+      }
+      function successCamera(value, result, token) {
+        if (generation !== token || captureDone || !captureMode) return;
+        captureDone = true;
+        const format = result?.result?.format?.formatName || 'DESCONHECIDO';
+        if (add(value, format, 'camera', captureMode)) {
+          void closeCapture();
+        } else {
+          captureDone = false;
+        }
+      }
+      async function beginCapture(mode, selectedId = '') {
+        if (captureBusy) return;
+        if (!window.isSecureContext) {
+          message('Para utilizar a câmara, abra a aplicação por HTTPS (Cloudflare Tunnel).', 'error');
+          return;
+        }
+        if (typeof Html5Qrcode === 'undefined') {
+          message('O leitor de códigos não carregou. Verifique a ligação à Internet e atualize a página.', 'error');
+          return;
+        }
+        if (cameraRunning && captureMode && !selectedId) {
+          showMode(mode);
+          message('Câmara ativa. A próxima leitura será uma ' + (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + '.', 'warn');
+          return;
+        }
+        captureBusy = true;
+        generation++;
+        const token = generation;
+        captureDone = false;
+        showMode(mode);
+        capturePanel.hidden = false;
+        captureInfo.textContent = 'A preparar a câmara, aguarde…';
+        try {
+          await stopDecoder();
+          if (generation !== token) return;
+          decoder = new Html5Qrcode('reader', {verbose:false});
+          cameras = await Html5Qrcode.getCameras();
+          if (generation !== token) return;
+          cameraSelect.replaceChildren();
+          const automatic = document.createElement('option');
+          automatic.value = '';
+          automatic.textContent = 'Traseira (automático)';
+          cameraSelect.appendChild(automatic);
+          cameras.forEach((cam, i) => {
+            const opt = document.createElement('option');
+            opt.value = cam.id;
+            opt.textContent = cam.label || ('Câmara ' + (i + 1));
+            cameraSelect.appendChild(opt);
+          });
+          const rear = cameras.find(c => /back|rear|environment|traseir|facing back/i.test(c.label || ''));
+          const target = selectedId || (rear ? rear.id : {facingMode:{exact:'environment'}});
+          const config = {fps:10};
+          const callback = (value, result) => successCamera(value, result, token);
+          try {
+            await decoder.start(target, config, callback, () => {});
+          } catch (firstError) {
+            if (selectedId) throw firstError;
+            // Alguns telemóveis não respeitam facingMode: escolher a última câmara como alternativa.
+            const fallback = rear ? {facingMode:'environment'} :
+              cameras.length ? cameras[cameras.length - 1].id : {facingMode:'environment'};
+            await decoder.start(fallback, config, callback, () => {});
+          }
+          cameraRunning = true;
+          if (generation !== token) { await closeCapture(); return; }
+          cameraSelect.value = typeof target === 'string' ? target : '';
+          captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': aponte ao código até ser reconhecido.';
+          message('Câmara ativa. Aproximar o código com boa luz e foco.', '');
+        } catch (error) {
+          await stopDecoder();
+          captureInfo.textContent = 'Câmara indisponível. Pode tentar outra vez ou escolher uma fotografia.';
+          message(cameraError(error), 'error');
+        } finally {
+          captureBusy = false;
+        }
+      }
+      async function scanPhoto(file) {
+        if (!captureMode || captureBusy) return;
+        if (typeof Html5Qrcode === 'undefined') {
+          message('A biblioteca de leitura não carregou.', 'error');
+          return;
+        }
+        if (!file.type.startsWith('image/')) {
+          message('Selecione uma fotografia válida.', 'warn');
+          return;
+        }
+        captureBusy = true;
+        generation++;
+        captureDone = false;
+        const mode = captureMode;
+        try {
+          await stopDecoder();
+          decoder = new Html5Qrcode('reader', {verbose:false});
+          captureInfo.textContent = 'A analisar a fotografia…';
+          const result = await decoder.scanFileV2(file, true);
+          const text = result.decodedText;
+          const format = result.result?.format?.formatName || 'DESCONHECIDO';
+          if (add(text, format, 'camera', mode)) {
+            await stopDecoder();
+            captureMode = null;
+            capturePanel.hidden = true;
+            movementIn.setAttribute('aria-pressed','false');
+            movementOut.setAttribute('aria-pressed','false');
+          }
+        } catch (error) {
+          message('O código não foi reconhecido na fotografia. Tente uma imagem mais nítida, com o código completo e bem iluminado.', 'warn');
+          captureInfo.textContent = 'Fotografia não reconhecida. Tente novamente ou use a câmara.';
+        } finally {
+          captureBusy = false;
+        }
+      }
+
       try {
-        const s = localStorage.getItem(KEY);
-        if (s) {
-          const parsed = JSON.parse(s);
+        const stored = localStorage.getItem(KEY);
+        if (stored) {
+          const parsed = JSON.parse(stored);
           records = Array.isArray(parsed) ? parsed.filter(isRecord) : [];
         }
       } catch (error) {
         storageAvailable = false;
-        message('Não foi possível recuperar o histórico local. Não apague dados sem verificar os seus ficheiros exportados.', 'error');
+        message('Não foi possível recuperar o histórico local. Não apague os dados antes de recuperar uma exportação.', 'error');
       }
       render();
-      movementIn.addEventListener('click', () => setMovement('entrada'));
-      movementOut.addEventListener('click', () => setMovement('saida'));
-      message('Escolha ENTRADA ou SAÍDA antes de começar a leitura.', 'warn');
-      document.getElementById('manual-form').addEventListener('submit', (event) => {
+      message('Toque em «Registar entrada» ou «Registar saída» para abrir a câmara.', '');
+      movementIn.addEventListener('click', () => { void beginCapture('entrada'); });
+      movementOut.addEventListener('click', () => { void beginCapture('saida'); });
+      captureCancel.addEventListener('click', () => { if (!captureBusy) void closeCapture(); });
+      cameraSelect.addEventListener('change', () => {
+        if (captureMode && !captureBusy) void beginCapture(captureMode, cameraSelect.value);
+      });
+      capturePhoto.addEventListener('click', () => { if (!captureBusy) captureFile.click(); });
+      captureFile.addEventListener('change', () => {
+        const file = captureFile.files && captureFile.files[0];
+        captureFile.value = '';
+        if (file) void scanPhoto(file);
+      });
+      byId('manual-form').addEventListener('submit', event => {
         event.preventDefault();
-        const input = document.getElementById('manual-value');
-        const code = input.value.trim();
-        if (code && add(code, 'MANUAL', 'manual')) { input.value=''; input.focus(); }
+        const input = byId('manual-value');
+        const mode = requireOtherMode();
+        if (!mode) return;
+        const value = input.value.trim();
+        if (value && add(value, 'MANUAL', 'manual', mode)) {input.value = ''; input.focus();}
       });
       function scannerSubmit() {
-        // Preservar o valor completo do código como string (inclusive zeros à esquerda).
+        const mode = requireOtherMode();
+        if (!mode) return;
         const value = scannerInput.value;
-        if (!value.trim()) { scannerInput.value = ''; scannerInput.focus(); return; }
-        if (add(value, 'DESCONHECIDO', 'scanner_hid')) {
+        if (!value.trim()) {scannerInput.value = ''; scannerInput.focus();return;}
+        if (add(value, 'DESCONHECIDO', 'scanner_hid', mode)) {
           scannerInput.value = '';
           scannerInput.focus();
         }
       }
-      document.getElementById('scanner-form').addEventListener('submit', event => {
+      byId('scanner-form').addEventListener('submit', event => {
         event.preventDefault();
         scannerSubmit();
       });
-      // Há pistolas configuradas para terminar a leitura com Tab em vez de Enter.
       scannerInput.addEventListener('keydown', event => {
-        if (event.key === 'Tab') {
-          event.preventDefault();
-          scannerSubmit();
-        }
+        if (event.key === 'Tab') {event.preventDefault();scannerSubmit();}
       });
       scannerInput.addEventListener('focus', () => {
         scannerState.textContent = 'Pronta para leitura';
@@ -303,11 +503,11 @@
       scannerArm.addEventListener('click', () => scannerInput.focus());
       exportButton.addEventListener('click', () => {
         const content = records.map(r => JSON.stringify(r)).join('\n') + '\n';
-        const blob = new Blob([content], { type:'text/plain;charset=utf-8' });
+        const blob = new Blob([content], {type:'text/plain;charset=utf-8'});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href=url;
-        a.download='leituras_' + new Date().toISOString().replace(/[-:]/g,'').replace(/T/,'_').slice(0,15) + '.txt';
+        a.href = url;
+        a.download = 'leituras_' + new Date().toISOString().replace(/[-:]/g,'').replace(/T/,'_').slice(0,15) + '.txt';
         document.body.appendChild(a);a.click();a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 2000);
         message('TXT gerado. Confirme que o ficheiro foi guardado no dispositivo.', 'success');
@@ -316,48 +516,30 @@
         if (!confirm('Apagar todas as ' + records.length + ' leituras deste dispositivo? Exporte primeiro o TXT.')) return;
         if (save([])) message('Histórico local apagado.', 'success');
       });
-      const fileImport = document.getElementById('file-import');
-      document.getElementById('backup-import').addEventListener('click', () => fileImport.click());
+      const fileImport = byId('file-import');
+      byId('backup-import').addEventListener('click', () => fileImport.click());
       fileImport.addEventListener('change', async () => {
-        const file = fileImport.files && fileImport.files[0]; fileImport.value='';
+        const file = fileImport.files && fileImport.files[0];
+        fileImport.value = '';
         if (!file) return;
-        if (file.size > 5 * 1024 * 1024) { message('O ficheiro excede o limite de 5 MB.', 'warn'); return; }
+        if (file.size > 5 * 1024 * 1024) {message('O ficheiro excede 5 MB.', 'warn');return;}
         try {
-          const lines = (await file.text()).split(/\r?\n/).filter(s => s.trim());
-          const imported = lines.map(s => JSON.parse(s));
-          if (!imported.every(isRecord)) throw new Error('Formato de registo inválido.');
+          const lines = (await file.text()).split(/\r?\n/).filter(line => line.trim());
+          const imported = lines.map(line => JSON.parse(line));
+          if (!imported.every(isRecord)) throw new Error('Formato inválido.');
           const seen = new Set(records.map(r => r.id));
           const unseen = imported.filter(r => !seen.has(r.id) && (seen.add(r.id), true));
           if (save([...records, ...unseen])) message('Importação concluída: ' + unseen.length + ' leituras novas.', 'success');
         } catch (error) {
-          message('Não foi possível importar o ficheiro. Utilize o TXT exportado por esta aplicação.', 'error');
+          message('Não foi possível importar o ficheiro. Utilize um TXT exportado pela aplicação.', 'error');
         }
       });
       window.addEventListener('load', () => {
-        if (!storageAvailable) return;
         if (!window.isSecureContext) {
-          message('A câmara pode estar indisponível. Publique a aplicação num endereço HTTPS (por exemplo, Netlify).', 'warn');
+          message('A câmara exige HTTPS. Utilize o endereço do Cloudflare Tunnel.', 'warn');
+        } else if (typeof Html5Qrcode === 'undefined') {
+          message('A biblioteca da câmara não carregou. Verifique a ligação à Internet.', 'warn');
         }
-        if (typeof Html5QrcodeScanner === 'undefined') {
-          message('A biblioteca da câmara não carregou. A pistola USB/Bluetooth e a introdução manual continuam disponíveis.', 'warn');
-          return;
-        }
-        const scanner = new Html5QrcodeScanner('reader', {
-          fps: 10,
-          rememberLastUsedCamera: false,
-          videoConstraints: { facingMode: { ideal: 'environment' } },
-          showTorchButtonIfSupported: true,
-          showZoomSliderIfSupported: true
-        }, false);
-        scanner.render((decodedText, decodedResult) => {
-          const now = Date.now();
-          if (decodedText === lastCode && now - lastCodeAt < 3000) return;
-          const format = decodedResult?.result?.format?.formatName || 'DESCONHECIDO';
-          if (add(decodedText, format, 'camera')) {
-            lastCode = decodedText; lastCodeAt = now;
-          }
-        }, () => {});
-        if (window.isSecureContext && !movement) message('Leitor pronto. Escolha ENTRADA ou SAÍDA antes de ler.', 'warn');
       });
     })();
   </script>
