@@ -37,7 +37,10 @@ import com.google.mlkit.vision.common.InputImage;
 import org.json.JSONObject;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -141,6 +144,7 @@ public final class MainActivity extends AppCompatActivity {
                 Preview preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
                 ImageAnalysis analysis = new ImageAnalysis.Builder()
+                    .setTargetResolution(new android.util.Size(1920, 1080))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                     .build();
@@ -231,11 +235,31 @@ public final class MainActivity extends AppCompatActivity {
                 "format TEXT NOT NULL, value TEXT NOT NULL, source TEXT NOT NULL, movement TEXT NOT NULL)");
         }
         @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) { }
+        String formatName(int format) {
+            switch (format) {
+                case Barcode.FORMAT_QR_CODE: return "QR_CODE";
+                case Barcode.FORMAT_DATA_MATRIX: return "DATA_MATRIX";
+                case Barcode.FORMAT_EAN_13: return "EAN_13";
+                case Barcode.FORMAT_EAN_8: return "EAN_8";
+                case Barcode.FORMAT_CODE_128: return "CODE_128";
+                case Barcode.FORMAT_CODE_39: return "CODE_39";
+                case Barcode.FORMAT_CODE_93: return "CODE_93";
+                case Barcode.FORMAT_UPC_A: return "UPC_A";
+                case Barcode.FORMAT_UPC_E: return "UPC_E";
+                case Barcode.FORMAT_ITF: return "ITF";
+                case Barcode.FORMAT_CODABAR: return "CODABAR";
+                case Barcode.FORMAT_PDF417: return "PDF_417";
+                case Barcode.FORMAT_AZTEC: return "AZTEC";
+                default: return "DESCONHECIDO";
+            }
+        }
         void insert(String value, int format, String movement) {
             ContentValues values = new ContentValues();
             values.put("id", UUID.randomUUID().toString());
-            values.put("scanned_at", Instant.now().toString());
-            values.put("format", Barcode.getFormatString(format));
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT);
+            formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+            values.put("scanned_at", formatter.format(new Date()));
+            values.put("format", formatName(format));
             values.put("value", value);
             values.put("source", "camera");
             values.put("movement", movement);
