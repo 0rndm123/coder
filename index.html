@@ -47,30 +47,32 @@
     .movement-button.in {background:#087d61}
     .movement-button.out {background:#b52b45}
     .movement-button[aria-pressed="true"] {border-color:#14243a;box-shadow:0 0 0 3px #bed3eb}
-    .capture-panel {position:fixed;inset:0;z-index:9999;padding:12px 12px max(12px,env(safe-area-inset-bottom));background:#101923;color:white;border:0;border-radius:0;display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain}
+    /* Camera is the background of a genuine full-screen scanner. The full
+       source frame is decoded; object-fit only affects its presentation. */
+    .capture-panel {position:fixed;inset:0;width:100%;height:100%;height:100dvh;z-index:9999;padding:0;border:0;border-radius:0;background:#000;color:#fff;overflow:hidden;isolation:isolate}
     body.scanning {overflow:hidden}
-    .capture-panel .capture-info {color:white;margin:0 0 8px;flex-shrink:0}
-    .capture-panel .footnote {color:#d5e0ea;margin:4px 0}
-    .capture-panel .capture-controls label {color:white}
-    .capture-panel .capture-controls {margin:6px 0}
-    .capture-panel #reader {position:relative;flex:1 1 auto;min-height:46dvh;max-height:70dvh;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid #40546d;border-radius:14px}
-    .capture-panel #reader > div {width:100%}
-    .capture-panel #reader video {display:block;width:100%!important;height:100%!important;max-height:none!important;object-fit:contain!important;object-position:center}
-    .capture-panel .scanner-reticle {position:absolute;z-index:4;pointer-events:none;top:50%;left:50%;transform:translate(-50%,-50%);width:min(78%,320px);aspect-ratio:1.25;border:3px solid #a7efbe;border-radius:15px}
-    .capture-panel button {min-height:42px}
-    .capture-controls {display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
-    .capture-controls select,.other-movement select {padding:10px 11px;background:#fff;color:var(--ink);border:1px solid #b8c8da;border-radius:9px;font:inherit;max-width:100%}
-    .capture-panel #reader {background:#192333;min-height:235px}
-    /* No telemóvel a pré-visualização ocupa o espaço vertical disponível,
-       sem as faixas laterais escuras típicas de um vídeo horizontal. */
-    .capture-panel #reader {max-width:100%}
-    .camera-tools {display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
-    .zoom-control {display:flex;align-items:center;gap:10px;flex:1;min-width:175px;font-size:14px;font-weight:600}
-    #zoom-range {flex:1;min-width:90px;accent-color:var(--accent);height:36px}
-    #zoom-value {font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
-    #torch-toggle[aria-pressed="true"] {background:#fff3d6;border-color:#c99835;color:#67450a}
-    @media(max-width:500px) {.capture-panel{padding:10px}.capture-panel #reader{min-height:48dvh;max-height:66dvh}}
-
+    .capture-panel #reader {position:absolute!important;inset:0!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;max-width:none!important;border:0!important;border-radius:0!important;background:#000!important;overflow:hidden!important;display:block!important}
+    .capture-panel #reader > div {width:100%!important;height:100%!important;max-width:none!important}
+    .capture-panel #reader video {position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:cover!important;object-position:center!important;border:0!important;border-radius:0!important}
+    .capture-panel .scan-overlay-top {position:absolute;z-index:9;inset:0 0 auto;display:flex;gap:9px;align-items:flex-start;padding:calc(12px + env(safe-area-inset-top)) 12px 20px;background:linear-gradient(#000c,transparent)}
+    .capture-panel .capture-info {flex:1;color:#fff;font-size:16px;font-weight:700;margin:0;text-shadow:0 1px 3px #000}
+    .capture-panel #capture-cancel {background:#101a21d9;border:1px solid #fff7;color:white}
+    .capture-panel .scan-reticle {position:absolute;z-index:5;pointer-events:none;top:44%;left:50%;transform:translate(-50%,-50%);width:min(74vw,360px);height:min(58vw,290px);border:2px solid #b4ffcb;border-radius:16px}
+    .capture-panel .scan-overlay-bottom {position:absolute;z-index:9;inset:auto 0 0;padding:40px 12px calc(12px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px;background:linear-gradient(0deg,#03090df5 0%,#061019db 73%,transparent)}
+    .capture-panel .capture-controls {display:flex;align-items:center;flex-wrap:nowrap;gap:8px;margin:0}
+    .capture-panel .capture-controls label {color:white;font-size:13px;font-weight:600}
+    .capture-panel .capture-controls select {min-width:0;max-width:100%;flex:1;font-size:14px;padding:10px 8px;border:0;border-radius:9px;background:#fff;color:#14243a}
+    .capture-panel button {font-size:14px;min-height:42px;padding:10px 12px}
+    .capture-panel .photo-actions button {flex:1;min-width:0}
+    .capture-panel .camera-tools {display:flex;align-items:center;gap:9px;flex-wrap:nowrap;margin:0}
+    .capture-panel .zoom-control {display:flex;align-items:center;gap:9px;flex:1;min-width:0;font-size:14px;font-weight:700}
+    .capture-panel #zoom-range {min-width:32px;flex:1;height:34px;accent-color:#92e8aa}
+    .capture-panel #zoom-value {min-width:42px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .capture-panel #torch-toggle {background:#fff;color:#102030}
+    .capture-panel #torch-toggle[aria-pressed="true"] {background:#ffe0a1}
+    .capture-panel #capture-diagnostics {font-size:12px;line-height:1.3;color:#deebfa;margin:0}
+    .capture-panel .scan-help {display:none}
+    @media(orientation:landscape) {.capture-panel .scan-reticle {top:48%;width:min(50vw,460px);height:min(46vh,280px)}.capture-panel .scan-overlay-bottom{max-width:660px;margin:auto}}
     .capture-info {color:var(--ink);font-size:14px;font-weight:650;margin:0 0 10px}
     .other-movement {display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;font-size:14px;font-weight:650}
     .movement-cell.in {color:#075c46;font-weight:700}
@@ -114,29 +116,34 @@
       <p class="last-scan" id="last-scan" role="status" aria-live="polite">Toque num dos botões para começar.</p>
       <h3>Últimas 10 leituras</h3><ol id="recent-scans" class="recent-scan-list"></ol>
       <div class="capture-panel" id="capture-panel" hidden>
-        <p class="capture-info" id="capture-info" aria-live="polite">A preparar câmara…</p>
         <div id="reader"></div>
-        <div class="capture-controls">
-          <label for="camera-select">Câmara</label>
-          <select id="camera-select" aria-label="Escolher câmara"><option value="">Traseira (automático)</option></select>
-          <button type="button" class="outline" id="capture-cancel">Cancelar</button>
+        <div class="scan-reticle" aria-hidden="true"></div>
+        <div class="scan-overlay-top">
+          <p class="capture-info" id="capture-info" aria-live="polite">A preparar a câmara…</p>
+          <button type="button" class="outline" id="capture-cancel">Fechar</button>
         </div>
-        <div class="camera-tools" id="camera-tools" hidden>
-          <div class="zoom-control" id="zoom-control" hidden>
-            <label for="zoom-range">Zoom</label>
-            <input type="range" id="zoom-range" min="1" max="4" step="0.1" value="1" aria-label="Ampliar imagem da câmara" />
-            <output id="zoom-value" for="zoom-range">1,0×</output>
+        <div class="scan-overlay-bottom">
+          <div class="capture-controls">
+            <label for="camera-select">Câmara</label>
+            <select id="camera-select" aria-label="Escolher câmara"><option value="">Traseira (automático)</option></select>
           </div>
-          <button type="button" class="outline" id="torch-toggle" aria-pressed="false" hidden>Acender luz</button>
+          <div class="camera-tools" id="camera-tools" hidden>
+            <div class="zoom-control" id="zoom-control" hidden>
+              <label for="zoom-range">Zoom</label>
+              <input type="range" id="zoom-range" min="1" max="4" step="0.1" value="1" aria-label="Zoom real da câmara" />
+              <output id="zoom-value" for="zoom-range">1,0×</output>
+            </div>
+            <button type="button" class="outline" id="torch-toggle" aria-pressed="false" hidden>Luz</button>
+          </div>
+          <div class="capture-controls photo-actions">
+            <button type="button" class="outline" id="capture-photo">Ler fotografia</button>
+            <button type="button" class="outline" id="capture-take-photo">Fotografar código</button>
+            <input type="file" id="capture-file" accept="image/*" hidden />
+            <input type="file" id="capture-camera-file" accept="image/*" capture="environment" hidden />
+          </div>
+          <p class="footnote" id="capture-diagnostics" aria-live="polite">A preparar leitura de QR, Data Matrix e barras…</p>
+          <p class="footnote scan-help">O fotograma integral é analisado, mesmo quando a pré-visualização preenche todo o ecrã.</p>
         </div>
-        <div class="capture-controls">
-          <button type="button" class="outline" id="capture-photo">Ler de fotografia</button>
-          <button type="button" class="outline" id="capture-take-photo">Fotografar código</button>
-          <input type="file" id="capture-file" accept="image/*" hidden />
-          <input type="file" id="capture-camera-file" accept="image/*" capture="environment" hidden />
-        </div>
-        <p class="footnote" id="capture-diagnostics" aria-live="polite">Preparado para leitura. A câmara traseira e a focagem dependem do telemóvel.</p>
-        <p class="footnote">Lê QR, Data Matrix (código quadrado pequeno em etiquetas) e barras. Para códigos pequenos, use «Fotografar código»: serão analisadas também regiões ampliadas.</p>
       </div>
     </section>
     <section>
@@ -415,6 +422,9 @@
         captureMode = null;
         capturePanel.hidden = true;
         document.body.classList.remove('scanning');
+        if (document.fullscreenElement === capturePanel && document.exitFullscreen) {
+          try { await document.exitFullscreen(); } catch (error) {}
+        }
         movementIn.setAttribute('aria-pressed','false');
         movementOut.setAttribute('aria-pressed','false');
       }
@@ -476,7 +486,8 @@
           zoomRange.min = String(caps.zoom.min);
           zoomRange.max = String(caps.zoom.max);
           zoomRange.step = String(caps.zoom.step || 0.1);
-          const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 1));
+          // Actual camera zoom increases code pixel coverage, unlike CSS scale.
+          const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2));
           zoomRange.value = String(initial);
           zoomValue.textContent = zoomLabel(initial);
           zoomControl.hidden = false;
@@ -531,6 +542,13 @@
         lastScan.textContent = 'A aguardar leitura de ' + (mode === 'entrada' ? 'entrada' : 'saída') + '…';
         capturePanel.hidden = false;
         document.body.classList.add('scanning');
+        // Call Fullscreen API while still handling the original user gesture.
+        if (!document.fullscreenElement && typeof capturePanel.requestFullscreen === 'function') {
+          try {
+            const request = capturePanel.requestFullscreen({navigationUI:'hide'});
+            if (request && typeof request.catch === 'function') request.catch(() => {});
+          } catch (error) { /* Fixed-position viewport still works. */ }
+        }
         captureInfo.textContent = 'A preparar a câmara, aguarde…';
         try {
           await stopDecoder();
@@ -594,10 +612,6 @@
               '. Centre o Data Matrix, aproxime até ficar nítido ou fotografe.';
           }, 5000);
           if (generation !== token) { await closeCapture(); return; }
-          const reticle = document.createElement('div');
-          reticle.className = 'scanner-reticle';
-          reticle.setAttribute('aria-hidden', 'true');
-          byId('reader').appendChild(reticle);
           cameraSelect.value = typeof target === 'string' ? target : '';
           captureInfo.textContent = (mode === 'entrada' ? 'ENTRADA' : 'SAÍDA') + ': centre o QR, Data Matrix ou código de barras.';
           captureDiagnostics.textContent = 'Descodificador Data Matrix, QR e barras ativo. A verificar a focagem…';
@@ -717,6 +731,9 @@
             captureMode = null;
             capturePanel.hidden = true;
             document.body.classList.remove('scanning');
+            if (document.fullscreenElement === capturePanel && document.exitFullscreen) {
+              try { await document.exitFullscreen(); } catch (error) {}
+            }
             movementIn.setAttribute('aria-pressed','false');
             movementOut.setAttribute('aria-pressed','false');
           }
