@@ -49,3 +49,22 @@ test('scanner never renders untrusted decoded values as executable HTML', () => 
   assert.ok(html.includes('readConfirmation.hidden=false'));
   assert.ok(html.includes('localStorage.setItem(KEY, JSON.stringify(next))'));
 });
+
+
+test('mobile scanning uses the full camera viewport, not a small portrait preview', () => {
+  assert.ok(html.includes('height:100dvh'));
+  assert.ok(html.includes('object-fit:cover!important'));
+  assert.ok(html.includes('class="scan-overlay-bottom"'));
+  assert.ok(html.includes('class="scan-overlay-top"'));
+  assert.ok(html.includes("capturePanel.requestFullscreen({navigationUI:'hide'})"));
+  assert.ok(html.includes("const initial = Math.min(caps.zoom.max, Math.max(caps.zoom.min, 2))"));
+  assert.ok(html.includes("videoConstraints:"));
+  assert.ok(html.includes("width:{ideal:1920}"));
+  assert.ok(html.includes("height:{ideal:1080}"));
+});
+
+test('camera is stopped and fullscreen is exited after a confirmed read', () => {
+  assert.ok(html.includes('await stopDecoder()'));
+  assert.ok(html.includes('document.exitFullscreen()'));
+  assert.ok(html.includes('capturePanel.hidden = true'));
+});
