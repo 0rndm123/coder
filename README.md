@@ -1,4 +1,4 @@
-# Leitor de códigos multiplataforma (MVP 3)
+# Leitor de códigos multiplataforma (MVP 4)
 
 Aplicação web para **Android/iPhone (câmara)** e **PC Windows/Linux/macOS (pistola USB/Bluetooth em modo HID/teclado)**. Também permite introduzir códigos manualmente.
 
@@ -6,9 +6,9 @@ Aplicação web para **Android/iPhone (câmara)** e **PC Windows/Linux/macOS (pi
 
 1. Publicar `index.html` num alojamento estático HTTPS (por exemplo, Netlify Drop).
 2. Abrir o mesmo endereço num browser no PC ou no telemóvel.
-3. Antes de ler, selecionar **ENTRADA** (verde) ou **SAÍDA** (vermelho) nos botões no topo. O movimento permanece ativo até ser alterado, mas é necessário voltar a escolhê-lo ao recarregar a página.
-4. **Telemóvel**: usar a secção de câmara, permitir o acesso e ler os códigos. A aplicação tenta privilegiar a câmara traseira, conforme suporte do browser/equipamento.
-5. **PC**: ligar a pistola em **USB HID/Keyboard Wedge** ou **Bluetooth HID**, clicar em **Ativar pistola** e fazer a leitura; o campo deve permanecer focado. Configurar sufixo **Enter** (preferencial) ou **Tab**. Se não houver sufixo, clicar em **Registar código** depois da leitura.
+3. No telemóvel, tocar diretamente em **Registar entrada** (verde, ícone de câmara) ou **Registar saída** (vermelho, ícone de câmara). Isto abre a câmara para ler o código. Após uma leitura bem-sucedida, a câmara fecha e o movimento fica registado; para o próximo registo, voltar a tocar no botão pretendido.
+4. Durante a leitura pode escolher a câmara num seletor, que privilegia a câmara traseira, quando disponível. Para ler uma imagem guardada, tocar em **Ler QR/código de uma fotografia**. Caso não seja descodificada, a aplicação informa que não foi registado nenhum código.
+5. **PC com pistola**: escolher a operação no seletor de movimento para pistola/registo manual. Ligar a pistola em **USB HID/Keyboard Wedge** ou **Bluetooth HID**, clicar em **Ativar pistola** e fazer a leitura; o campo deve permanecer focado. Configurar sufixo **Enter** (preferencial) ou **Tab**.
 6. Em qualquer dispositivo, consultar o histórico, confirmar a coluna **Movimento** e **Exportar TXT**.
 
 É possível usar a webcam do PC ou uma pistola Bluetooth emparelhada com telemóvel, desde que o hardware e browser suportem estes modos.
@@ -20,14 +20,14 @@ Aplicação web para **Android/iPhone (câmara)** e **PC Windows/Linux/macOS (pi
 - A pistola tem de ser capaz de descodificar o código: um leitor **1D** não lê QR Code (2D).
 - A ligação HID transmite normalmente o **valor** e não a **simbologia**. O formato é guardado como `DESCONHECIDO` nas leituras da pistola; a câmara identifica-o quando a biblioteca o disponibiliza.
 - O campo precisa de ter **foco**. Se clicar noutro controlo, volte a ativar a pistola. O browser tem de estar em primeiro plano.
-- Cada leitura com pistola é registada, mesmo que o valor se repita. Apenas a **câmara** ignora repetições do mesmo valor durante 3 segundos.
+- Cada leitura com pistola é registada, mesmo que o valor se repita. Para a câmara, cada botão inicia um registo individual e a leitura fecha após ser guardada.
 
 ## Movimentos (entrada/saída)
 
-- Os botões de movimento são grandes, distinguem-se pela cor e apresentam o modo ativo. Cada leitura pela câmara, pistola ou introdução manual regista o movimento selecionado.
-- É obrigatório selecionar um movimento antes de registar novas leituras. O modo não é conservado após recarregar a página, para reduzir erros involuntários.
+- **Câmara:** cada botão grande com ícone de câmara inicia uma leitura imediatamente com a operação correspondente, sem uma seleção prévia. O leitor fecha após uma leitura registada, evitando repetições involuntárias.
+- **Pistola e registo manual:** escolher o movimento no seletor separado antes de registar; assim o movimento não depende de uma sessão de câmara anterior.
 - Os dados já existentes continuam legíveis. Registos antigos sem `movement` aparecem com movimento não indicado (—). A importação TXT antiga continua suportada.
-- Ao mudar de movimento, confirme visualmente o modo ativo antes da próxima leitura.
+- Se a câmara ou a fotografia não reconhecerem o código, não é criado um registo. Confirmar sempre a mensagem de sucesso ou o histórico.
 
 ## Registos e ficheiros
 
