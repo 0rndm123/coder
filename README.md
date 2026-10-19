@@ -1,4 +1,4 @@
-# Leitor de códigos multiplataforma (MVP 4)
+# Leitor de códigos multiplataforma (MVP 5)
 
 Aplicação web para **Android/iPhone (câmara)** e **PC Windows/Linux/macOS (pistola USB/Bluetooth em modo HID/teclado)**. Também permite introduzir códigos manualmente.
 
@@ -7,7 +7,7 @@ Aplicação web para **Android/iPhone (câmara)** e **PC Windows/Linux/macOS (pi
 1. Publicar `index.html` num alojamento estático HTTPS (por exemplo, Netlify Drop).
 2. Abrir o mesmo endereço num browser no PC ou no telemóvel.
 3. No telemóvel, tocar diretamente em **Registar entrada** (verde, ícone de câmara) ou **Registar saída** (vermelho, ícone de câmara). Isto abre a câmara para ler o código. Após uma leitura bem-sucedida, a câmara fecha e o movimento fica registado; para o próximo registo, voltar a tocar no botão pretendido.
-4. Durante a leitura pode escolher a câmara num seletor. A aplicação tenta abrir a câmara traseira com resolução elevada e combina a biblioteca JavaScript com o motor nativo `BarcodeDetector`, quando o browser o suporta. Pode tocar em **Ler de fotografia** para escolher uma imagem guardada ou em **Fotografar código** para tirar uma fotografia com a câmara do telemóvel e tentar descodificá-la. Quando o código não é reconhecido, não é criado um registo.
+4. Durante a leitura pode escolher a câmara num seletor. A aplicação tenta abrir a câmara traseira com resolução elevada e combina a biblioteca JavaScript com o motor nativo `BarcodeDetector`, quando o browser o suporta. A vista da câmara ocupa mais altura no telemóvel, sem faixas laterais; quando a câmara permite, aplica focagem contínua e zoom inicial de aproximadamente 1,8×. O controlo **Zoom** permite ajustar a aproximação real da câmara e o botão **Acender luz** ativa a lanterna nos dispositivos compatíveis. Pode tocar em **Ler de fotografia** para escolher uma imagem guardada ou em **Fotografar código** para tirar uma fotografia com a câmara do telemóvel e tentar descodificá-la. Quando o código não é reconhecido, não é criado um registo.
 5. **PC com pistola**: escolher a operação no seletor de movimento para pistola/registo manual. Ligar a pistola em **USB HID/Keyboard Wedge** ou **Bluetooth HID**, clicar em **Ativar pistola** e fazer a leitura; o campo deve permanecer focado. Configurar sufixo **Enter** (preferencial) ou **Tab**.
 6. Em qualquer dispositivo, consultar o histórico, confirmar a coluna **Movimento** e **Exportar TXT**.
 
@@ -65,7 +65,7 @@ Pode importar o JSONL com Python, `json.loads` e `INSERT ... ON CONFLICT (id) DO
 
 - A câmara requer HTTPS e permissão do utilizador (exceto contextos locais seguros, como `localhost`). A preferência pela câmara traseira e pela resolução elevada depende do browser e não é garantida em todos os dispositivos.
 - O descodificador nativo `BarcodeDetector` está disponível apenas nalguns browsers, sendo complementado pelo leitor `html5-qrcode` já existente; não equivale a abrir a aplicação nativa de leitura QR do telemóvel.
-- A qualidade da focagem e a lente selecionada podem diferir da app nativa. Se o vídeo não reconhecer um QR Code, aproxime-o até ficar nítido, escolha outra lente/câmara ou use **Fotografar código**. Valide o registo pela mensagem de sucesso e pelo histórico.
+- A qualidade da focagem e a lente selecionada podem diferir da app nativa. O enquadramento do vídeo é ampliado visualmente e pode ocultar as margens da imagem; a descodificação continua a trabalhar com os fotogramas da câmara. O zoom real, a focagem contínua e a lanterna só funcionam quando o browser expõe essas capacidades através de `MediaStreamTrack.getCapabilities` e `applyConstraints`. Se o vídeo não reconhecer um QR Code, aproxime-o até ficar nítido, escolha outra lente/câmara ou use **Fotografar código**. Valide o registo pela mensagem de sucesso e pelo histórico.
 - A biblioteca `html5-qrcode@2.3.8` é carregada via CDN, pelo que a primeira utilização da câmara requer Internet; a pistola e o modo manual não dependem dessa biblioteca.
 - Não existe backend, login nem sincronização. Também não há suporte offline garantido para carregar a aplicação.
 - A tabela mostra as últimas 80 leituras; a exportação inclui todas.
