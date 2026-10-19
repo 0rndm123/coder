@@ -1,0 +1,33 @@
+name: Validation
+
+on:
+  push:
+    branches:
+      - main
+      - review/**
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-and-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Syntax
+        run: |
+          node --check assets/app.js
+          node --check assets/scan-domain.js
+          node --check tests/scan-domain.test.cjs
+      - name: Unit tests
+        run: node --test tests/*.test.cjs
+      - name: Static security checks
+        run: |
+          node -e "const fs=require('node:fs'); const assert=require('node:assert/strict'); const html=fs.readFileSync('index.html','utf8'); const app=fs.readFileSync('assets/app.js','utf8'); assert(!/<script\\s*>/i.test(html)); assert(!/\\.innerHTML\\s*=/i.test(app)); assert(/Content-Security-Policy/.test(html)); assert(/assets\\/scan-domain\\.js/.test(html));"
