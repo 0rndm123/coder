@@ -26,12 +26,16 @@ import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.Preview;
+import androidx.camera.core.FocusMeteringAction;
+import androidx.camera.core.MeteringPoint;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.BarcodeScanner;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
+import com.google.mlkit.vision.barcode.ZoomSuggestionOptions;
 import com.google.mlkit.vision.barcode.common.Barcode;
 import com.google.mlkit.vision.common.InputImage;
 import org.json.JSONObject;
@@ -52,7 +56,22 @@ public final class MainActivity extends AppCompatActivity {
     private static final long SAME_CODE_COOLDOWN_MS = 2200;
     private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean processing = new AtomicBoolean(false);
-    private final BarcodeScanner scanner = BarcodeScanning.getClient();
+    private final BarcodeScanner scanner = BarcodeScanning.getClient(
+        new BarcodeScannerOptions.Builder()
+            .enableAllPotentialBarcodes()
+            .setZoomSuggestionOptions(new ZoomSuggestionOptions.Builder(suggested -> {
+                Camera c = camera;
+                if (c == null || processing.get() == false) return false;
+                androidx.camera.core.ZoomState state = c.getCameraInfo().getZoomState().getValue();
+                if (state == null) return false;
+                float bounded = Math.max(state.getMinZoomRatio(),
+                    Math.min(Math.min(state.getMaxZoomRatio(), 3f), suggested));
+                if (bounded < zoomRatio + 0.08f) return false;
+                zoomRatio = bounded;
+                c.getCameraControl().setZoomRatio(bounded);
+                return true;
+            }).setMaxSupportedZoomRatio(3f).build())
+            .build());
     private PreviewView previewView;
     private TextView status;
     private TextView counter;
@@ -118,6 +137,16 @@ public final class MainActivity extends AppCompatActivity {
             });
         previewView.setOnTouchListener((v, event) -> {
             gestures.onTouchEvent(event);
+            if (event.getAction() == android.view.MotionEvent.ACTION_UP && !gestures.isInProgress()) {
+                Camera c = camera;
+                if (c != null && previewView.getWidth() > 0 && previewView.getHeight() > 0) {
+                    MeteringPoint point = previewView.getMeteringPointFactory()
+                        .createPoint(event.getX(), event.getY());
+                    c.getCameraControl().startFocusAndMetering(
+                        new FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF |
+                            FocusMeteringAction.FLAG_AE).build());
+                }
+            }
             return true;
         });
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -143,6 +172,8 @@ public final class MainActivity extends AppCompatActivity {
                 ProcessCameraProvider provider = future.get();
                 Preview preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
+                // Request a high-detail ~2 MP analysis frame; CameraX adapts to
+                // the supported sizes of each manufacturer's camera hardware.
                 ImageAnalysis analysis = new ImageAnalysis.Builder()
                     .setTargetResolution(new android.util.Size(1920, 1080))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
