@@ -4,6 +4,13 @@ Aplicação web para **Android/iPhone (câmara)** e **PC Windows/Linux/macOS (pi
 
 ## Arranque
 
+### Arranque local no Windows — porta 8200
+
+Executar `start.bat` a partir da pasta do repositório. O servidor HTTP local arranca na porta **8200**; no PC, abrir `http://localhost:8200/`. Para terminar, premir `Ctrl+C` na janela do servidor. O launcher exige Python 3 e utiliza a pasta onde se encontra o próprio script, evitando conflitos com outras aplicações que usem as portas 8000 ou 8100.
+
+**Nota sobre o telemóvel:** a câmara via browser exige HTTPS ou `localhost`. Aceder diretamente a `http://IP_DO_PC:8200` pela rede local pode mostrar a página mas impedir o acesso à câmara. Para testes no telemóvel, usar um túnel HTTPS apontado para `http://localhost:8200` ou outro alojamento HTTPS. A porta 8200 refere-se ao servidor local, não à porta pública de um túnel.
+
+
 1. Publicar `index.html` num alojamento estático HTTPS (por exemplo, Netlify Drop).
 2. Abrir o mesmo endereço num browser no PC ou no telemóvel.
 3. No telemóvel, tocar diretamente em **Registar entrada** (verde, ícone de câmara) ou **Registar saída** (vermelho, ícone de câmara). Isto abre a câmara para ler o código. Após uma leitura bem-sucedida, a câmara fecha e o movimento fica registado; para o próximo registo, voltar a tocar no botão pretendido.
