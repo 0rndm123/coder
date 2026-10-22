@@ -230,6 +230,11 @@ public final class MainActivity extends AppCompatActivity {
                 androidx.camera.core.ZoomState initialZoom = camera.getCameraInfo().getZoomState().getValue();
                 zoomRatio = initialZoom != null ? initialZoom.getZoomRatio() : 1f;
                 torchButton.setEnabled(camera.getCameraInfo().hasFlashUnit());
+                android.util.Log.i("CodeReader", "Camera bound: " +
+                    camera.getCameraInfo().getCameraSelector().toString() +
+                    " | zoom=" + zoomRatio);
+                status.setText("Câmara pronta · leitura contínua · " +
+                    movement.toUpperCase(Locale.ROOT));
             } catch (Exception e) {
                 status.setText("Erro na câmara: " + e.getClass().getSimpleName());
             }
