@@ -77,6 +77,8 @@ public final class MainActivity extends AppCompatActivity {
     private TextView counter;
     private Button inButton;
     private Button outButton;
+    private Button torchButton;
+    private boolean torchOn = false;
     private String movement = "entrada";
     private String lastKey = "";
     private long lastAcceptedAt = 0;
@@ -98,6 +100,10 @@ public final class MainActivity extends AppCompatActivity {
         inButton = makeButton("ENTRADA", controls);
         outButton = makeButton("SAÍDA", controls);
         root.addView(controls);
+        torchButton = new Button(this);
+        torchButton.setText("Acender luz");
+        torchButton.setOnClickListener(v -> toggleTorch());
+        root.addView(torchButton);
         status = new TextView(this);
         status.setTextColor(0xffffffff);
         status.setTextSize(17);
@@ -165,6 +171,18 @@ public final class MainActivity extends AppCompatActivity {
         outButton.setAlpha("saida".equals(value) ? 1f : 0.55f);
         status.setText("Leitura contínua · " + value.toUpperCase() + " · aproxime o código");
     }
+    private void toggleTorch() {
+        Camera c = camera;
+        if (c == null || !c.getCameraInfo().hasFlashUnit()) {
+            status.setText("Lanterna indisponível nesta câmara.");
+            return;
+        }
+        boolean requested = !torchOn;
+        c.getCameraControl().enableTorch(requested).addListener(() -> runOnUiThread(() -> {
+            torchOn = requested;
+            torchButton.setText(torchOn ? "Apagar luz" : "Acender luz");
+        }), ContextCompat.getMainExecutor(this));
+    }
     private void startCamera() {
         ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(this);
         future.addListener(() -> {
@@ -209,7 +227,9 @@ public final class MainActivity extends AppCompatActivity {
                 });
                 provider.unbindAll();
                 camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
-                zoomRatio = 1f;
+                androidx.camera.core.ZoomState initialZoom = camera.getCameraInfo().getZoomState().getValue();
+                zoomRatio = initialZoom != null ? initialZoom.getZoomRatio() : 1f;
+                torchButton.setEnabled(camera.getCameraInfo().hasFlashUnit());
             } catch (Exception e) {
                 status.setText("Erro na câmara: " + e.getClass().getSimpleName());
             }
