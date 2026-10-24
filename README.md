@@ -4,6 +4,11 @@ Aplicação web para **Android/iPhone (câmara)** e **PC Windows/Linux/macOS (pi
 
 ## Arranque
 
+### Arranque num só passo — localhost e Cloudflare Tunnel
+
+No Windows, executar **`start-all.bat`**. O script verifica Python, inicia (ou reutiliza) o servidor da aplicação em `http://localhost:8200/`, verifica se o conteúdo esperado está a responder, obtém o executável `cloudflared` oficial para Windows x64 quando necessário, e abre um **Cloudflare Quick Tunnel HTTPS** mostrando o endereço público na consola. O servidor local permanece numa janela própria minimizada e o túnel nesta janela. Manter ambas as janelas abertas. O Quick Tunnel cria um URL temporário diferente em cada arranque, não requer conta nem configura Cloudflare Access. **Qualquer pessoa com o URL pode aceder à aplicação; utilizar apenas para testes.** Para túnel persistente, definir a variável de ambiente `QR_TUNNEL_TOKEN` com o token do túnel configurado na Cloudflare e associar o respetivo hostname a `http://localhost:8200` no painel. Não guardar tokens no Git. Se a porta 8200 estiver ocupada por outro serviço, o script aborta. Requer Windows x64, PowerShell, Python 3 e Internet. Não foi testado num PC Windows real.
+
+
 ### Arranque local no Windows — porta 8200
 
 Executar `start.bat` a partir da pasta do repositório. O servidor HTTP local arranca na porta **8200**; no PC, abrir `http://localhost:8200/`. Para terminar, premir `Ctrl+C` na janela do servidor. O launcher exige Python 3 e utiliza a pasta onde se encontra o próprio script, evitando conflitos com outras aplicações que usem as portas 8000 ou 8100.
