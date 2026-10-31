@@ -538,6 +538,7 @@
       function startEnhancedScan(token) {
         if (enhancedScanTimer) clearInterval(enhancedScanTimer);
         const canvas = document.createElement('canvas');
+        let pass = 0;
         enhancedScanTimer = setInterval(async () => {
           if (enhancedScanBusy || !cameraRunning || captureBusy ||
               captureDone || generation !== token || !captureMode ||
@@ -547,17 +548,25 @@
           enhancedScanBusy = true;
           try {
             const vw = video.videoWidth, vh = video.videoHeight;
-            // Preserve pixel detail: crop the central 72% rather than scaling
-            // the entire portrait frame to a small preview.
-            const side = Math.min(vw, vh) * 0.72;
-            const sx = Math.round((vw - side) / 2);
-            const sy = Math.round((vh - side) / 2);
-            const pixels = Math.min(960, Math.round(side));
-            canvas.width = pixels;
-            canvas.height = pixels;
-            const ctx = canvas.getContext('2d', {willReadFrequently:false});
+            // Try native-sized frames first. Small Data Matrix labels can be
+            // outside the central crop; alternate between full frame and crops.
+            const regions = [
+              [0, 0, 1, 1],
+              [0.18, 0.18, 0.64, 0.64],
+              [0.30, 0.30, 0.40, 0.40]
+            ];
+            const [x, y, w, h] = regions[(pass++) % regions.length];
+            const sourceWidth = Math.round(vw * w);
+            const sourceHeight = Math.round(vh * h);
+            const maxDimension = 1600;
+            const ratio = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+            canvas.width = Math.max(1, Math.round(sourceWidth * ratio));
+            canvas.height = Math.max(1, Math.round(sourceHeight * ratio));
+            const ctx = canvas.getContext('2d');
             if (!ctx) return;
-            ctx.drawImage(video, sx, sy, side, side, 0, 0, pixels, pixels);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(video, Math.round(vw * x), Math.round(vh * y),
+              sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
             const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
             if (!blob || generation !== token || captureDone) return;
             const found = await decodeWithWasm(blob);
@@ -569,7 +578,7 @@
           } finally {
             enhancedScanBusy = false;
           }
-        }, 1200);
+        }, 750);
       }
       async function beginCapture(mode, selectedId = '') {
         if (captureBusy) return;
