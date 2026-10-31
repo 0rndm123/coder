@@ -29,21 +29,23 @@ goto :fail
 
 :python_ready
 echo [2/4] A iniciar servidor local na porta %PORT%...
-powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -TimeoutSec 2; if($r.Content -notmatch 'Leitor de c.digos|Registo de entradas e sa.das') { exit 2 }; exit 0 } catch {exit 1}" >nul 2>&1
+powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -TimeoutSec 2; if($r.Content -notmatch 'leitor_codigos_mvp_v1') { exit 2 }; exit 0 } catch {exit 1}" >nul 2>&1
 if not errorlevel 1 (
     echo Servidor da aplicacao ja activo em %URL%
     goto :server_ready
 )
 powershell -NoProfile -Command "try { $c=New-Object Net.Sockets.TcpClient; $a=$c.BeginConnect('127.0.0.1',%PORT%,$null,$null); if($a.AsyncWaitHandle.WaitOne(800)) { $c.EndConnect($a); exit 1 }; exit 0 } catch {exit 0} finally {if($c){$c.Close()}}" >nul 2>&1
 if errorlevel 1 (
-    echo ERRO: porta %PORT% ocupada por outro processo. Nao sera iniciado um tunel para esse servico.
+    echo ERRO: porta %PORT% ocupada por um processo que nao foi identificado como esta aplicacao.
+    echo Para identificar o processo, execute: netstat -ano ^| findstr :%PORT%
+    echo Nao vou publicar um servico desconhecido num tunel externo.
     goto :fail
 )
 start "QR Scanner - Servidor 8200" /min cmd /k "cd /d ""%~dp0"" && %PYTHON_CMD% -m http.server %PORT% --bind 127.0.0.1"
 set "SERVER_OK="
 for /l %%I in (1,1,15) do (
     if not defined SERVER_OK (
-        powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -TimeoutSec 2; if($r.StatusCode -eq 200 -and $r.Content -match 'Leitor de c.digos|Registo de entradas e sa.das'){exit 0}; exit 1 } catch {exit 1}" >nul 2>&1
+        powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -TimeoutSec 2; if($r.StatusCode -eq 200 -and $r.Content -match 'leitor_codigos_mvp_v1'){exit 0}; exit 1 } catch {exit 1}" >nul 2>&1
         if not errorlevel 1 set "SERVER_OK=1"
         if not defined SERVER_OK timeout /t 1 /nobreak >nul
     )
