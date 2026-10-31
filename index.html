@@ -617,7 +617,13 @@
             useBarCodeDetectorIfSupported:true,
             ...(formats.length ? {formatsToSupport:formats} : {})
           });
-          cameras = await Html5Qrcode.getCameras();
+          // Device enumeration can fail on Android even when getUserMedia works.
+          // Do not prevent camera startup just because labels are unavailable.
+          try { cameras = await Html5Qrcode.getCameras(); }
+          catch (enumerationError) {
+            console.warn('Camera enumeration unavailable:', enumerationError);
+            cameras = [];
+          }
           if (generation !== token) return;
           cameraSelect.replaceChildren();
           const automatic = document.createElement('option');
@@ -646,11 +652,22 @@
           try {
             await decoder.start(target, config, callback, () => {});
           } catch (firstError) {
-            if (selectedId) throw firstError;
-            // Se constraints de resolução ou de lente falharem, voltar a um
-            // arranque simples, permitindo selecionar a câmara manualmente.
-            const fallback = rear ? rear.id : {facingMode:'environment'};
-            await decoder.start(fallback, {fps:12}, callback, () => {});
+            console.warn('High-resolution camera start failed:', firstError);
+            // A failed html5-qrcode start can leave the instance in an
+            // unusable state. Recreate it before retrying without constraints.
+            try { await decoder.stop(); } catch (ignored) {}
+            try { decoder.clear(); } catch (ignored) {}
+            decoder = new Html5Qrcode('reader', {
+              verbose:false, disableFlip:true, useBarCodeDetectorIfSupported:true,
+              ...(formats.length ? {formatsToSupport:formats} : {})
+            });
+            const fallback = selectedId ? selectedId : {facingMode:'environment'};
+            try {
+              await decoder.start(fallback, {fps:10}, callback, () => {});
+            } catch (secondError) {
+              console.warn('Simple camera start failed:', secondError);
+              throw secondError;
+            }
           }
           cameraRunning = true;
           scanStartedAt = Date.now();
@@ -674,7 +691,16 @@
         } catch (error) {
           await stopDecoder();
           captureInfo.textContent = 'Câmara indisponível. Pode tentar outra vez ou escolher uma fotografia.';
-          message(cameraError(error), 'error');
+          const explanation = cameraError(error);
+          captureDiagnostics.textContent = explanation;
+          message(explanation, 'error');
+          // Never trap the user in an empty full-screen camera overlay.
+          capturePanel.hidden = true;
+          document.body.classList.remove('scanning');
+          captureMode = null;
+          if (document.fullscreenElement === capturePanel && document.exitFullscreen) {
+            try { await document.exitFullscreen(); } catch (ignored) {}
+          }
         } finally {
           captureBusy = false;
         }
