@@ -104,6 +104,11 @@ public final class MainActivity extends AppCompatActivity {
         torchButton.setText("Acender luz");
         torchButton.setOnClickListener(v -> toggleTorch());
         root.addView(torchButton);
+        TextView hint = new TextView(this);
+        hint.setText("Centre o código (especialmente Data Matrix). Toque para focar; use luz se necessário.");
+        hint.setTextColor(0xffd9e9f5);
+        hint.setPadding(8, 4, 8, 4);
+        root.addView(hint);
         status = new TextView(this);
         status.setTextColor(0xffffffff);
         status.setTextSize(17);
@@ -193,7 +198,7 @@ public final class MainActivity extends AppCompatActivity {
                 // Request a high-detail ~2 MP analysis frame; CameraX adapts to
                 // the supported sizes of each manufacturer's camera hardware.
                 ImageAnalysis analysis = new ImageAnalysis.Builder()
-                    .setTargetResolution(new android.util.Size(1920, 1080))
+                    .setTargetResolution(new android.util.Size(1600, 1200))
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                     .build();
@@ -227,9 +232,12 @@ public final class MainActivity extends AppCompatActivity {
                 });
                 provider.unbindAll();
                 camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis);
+                previewView.setScaleType(PreviewView.ScaleType.FIT_CENTER);
                 androidx.camera.core.ZoomState initialZoom = camera.getCameraInfo().getZoomState().getValue();
                 zoomRatio = initialZoom != null ? initialZoom.getZoomRatio() : 1f;
                 torchButton.setEnabled(camera.getCameraInfo().hasFlashUnit());
+                // Analysis and preview share the same CameraX session.
+                // Avoid scaling image data before ML Kit processes it.
                 android.util.Log.i("CodeReader", "Rear camera bound; zoom=" + zoomRatio);
                 status.setText("Câmara pronta · leitura contínua · " +
                     movement.toUpperCase(Locale.ROOT));
