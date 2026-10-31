@@ -38,3 +38,13 @@ Módulo Android independente dentro do repositório `0rndm123/coder`. A versão 
 - Sem histórico navegável na interface nem sincronização PostgreSQL. O contador e a exportação estão implementados.
 - A gravação local não é encriptada ao nível da aplicação e a política Android de backup está desativada. Proteger os equipamentos e exportar regularmente.
 - O motor ML Kit melhora as possibilidades face ao leitor web, mas **não garante equivalência ao leitor nativo Samsung**.
+
+## Image quality and benchmark protocol (2026-10-31)
+
+- Analysis requests **1600×1200 (4:3)** YUV; CameraX may select a different supported resolution. The ML Kit input uses the original camera buffer, not a screenshot of the preview.
+- Preview uses `FIT_CENTER` so it is not visually cropped; this does not change the sensor frame. GS1 Data Matrix must intersect the image center for ML Kit recognition.
+- Tap the symbol for CameraX focus/metering; use torch where needed. Automatic zoom suggestions are bounded to 3×; zoom can trade detail for noise on some devices.
+- The UI now shows **ML Kit decode time** of the accepted analysis frame. This is **not** end-to-end scan latency. For acceptance testing, measure external elapsed time from presenting a code to a successful saved record.
+- Benchmark in equal lighting/distance against each phone's stock scanner on **at least 30 trials per symbol**, using EAN-13, EAN-8, Code 128, QR and very small GS1 Data Matrix.
+- Report p50/p95 end-to-end latency, first-pass success, wrong-code rate, autofocus recovery, battery/heat after extended scanning and number of dropped/duplicate events.
+- Do not call the build production-ready until the CI APK is successfully produced and the trial matrix passes on at least three different Android brands. The code and configuration changes have **not** been verified on-device from ChatGPT.
