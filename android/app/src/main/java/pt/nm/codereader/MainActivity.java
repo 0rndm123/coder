@@ -82,6 +82,9 @@ public final class MainActivity extends AppCompatActivity {
     private String movement = "entrada";
     private String lastKey = "";
     private long lastAcceptedAt = 0;
+    private long lastAcceptedDecodeMs = 0;
+    private long decodeStartedAtMs = 0;
+    private long totalDecoded = 0;
     private Camera camera;
     private float zoomRatio = 1f;
     private ScanStore store;
@@ -213,12 +216,14 @@ public final class MainActivity extends AppCompatActivity {
                         imageProxy.close();
                         return;
                     }
+                    decodeStartedAtMs = SystemClock.elapsedRealtime();
                     InputImage image = InputImage.fromMediaImage(frame, imageProxy.getImageInfo().getRotationDegrees());
                     scanner.process(image)
                         .addOnSuccessListener(barcodes -> {
                             for (Barcode barcode : barcodes) {
                                 String value = barcode.getRawValue();
                                 if (value != null && !value.isEmpty()) {
+                                    lastAcceptedDecodeMs = Math.max(0, SystemClock.elapsedRealtime() - decodeStartedAtMs);
                                     accept(value, barcode.getFormat());
                                     break;
                                 }
@@ -254,7 +259,9 @@ public final class MainActivity extends AppCompatActivity {
         lastAcceptedAt = now;
         try {
             store.insert(value, format, movement);
-            status.setText("Registado: " + value);
+            totalDecoded++;
+            status.setText("Registado: " + value + " · análise " +
+                lastAcceptedDecodeMs + " ms · leituras " + totalDecoded);
             refreshCount();
             Vibrator vib = (Vibrator) getSystemService(VIBRATOR_SERVICE);
             if (vib != null && vib.hasVibrator())
