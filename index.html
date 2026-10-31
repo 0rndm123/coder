@@ -623,7 +623,7 @@
           decoder = new Html5Qrcode('reader', {
             verbose:false,
             disableFlip:true,
-            useBarCodeDetectorIfSupported:true,
+            useBarCodeDetectorIfSupported:false,
             ...(formats.length ? {formatsToSupport:formats} : {})
           });
           // Device enumeration can fail on Android even when getUserMedia works.
@@ -667,7 +667,7 @@
             try { await decoder.stop(); } catch (ignored) {}
             try { decoder.clear(); } catch (ignored) {}
             decoder = new Html5Qrcode('reader', {
-              verbose:false, disableFlip:true, useBarCodeDetectorIfSupported:true,
+              verbose:false, disableFlip:true, useBarCodeDetectorIfSupported:false,
               ...(formats.length ? {formatsToSupport:formats} : {})
             });
             const fallback = selectedId ? selectedId : {facingMode:'environment'};
